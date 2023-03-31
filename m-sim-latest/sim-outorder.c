@@ -236,10 +236,13 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 		//Wattch -- Dcache2 access
 		cores[contexts[context_id].core_id].power.dcache2_access++;
 
-		if(cmd == Read)
+		if(cmd == Read) {
+			std::cout << "dl1 access returning lat for " << cmd << " cmd" << std::endl;
 			return lat;
+		}
 		else
 		{
+			std::cout << "dl1 access returned 0 for " << cmd << " cmd" << std::endl;
 			//FIXME: unlimited write buffers
 			return 0;
 		}
@@ -270,14 +273,18 @@ dl2_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	{
 		//access next level of data cache hierarchy
 		unsigned long long lat = cache_dl3->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		std::cout << "dl2_access_fn ran" << std::endl;
 
 		//Wattch -- Dcache2 access
 		cores[contexts[context_id].core_id].power.dcache3_access++;
 
-		if (cmd == Read)
+		if (cmd == Read) {
+			std::cout << "dl2_access_fn returned for read cmd" << std::endl;
 			return lat;
+		}
 		else
 		{
+			std::cout << "dl2_access_fn returned for write cmd" << std::endl;
 			//FIXME: unlimited write buffers
 			return 0;
 		}
@@ -305,13 +312,17 @@ dl3_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	int context_id)			//context id
 {
 	//Wattch -- main memory access -- Wattch-FIXME (offchip)
+	std::cout << "dl3_access_fn ran" << std::endl;
 
 	//this is a miss to the lowest level, so access main memory
-	if(cmd == Read)
+	if(cmd == Read) {
+		std::cout << "dl3_access_fn returned for a read cmd" << std::endl;
 		return cores[contexts[context_id].core_id].main_mem->mem_access_latency(baddr, bsize, now, context_id);
+	}
 	else
 	{
 		//FIXME: unlimited write buffers
+		std::cout << "dl3_access_fn returned for a write cmd" << std::endl;
 		return 0;
 	}
 }
@@ -1947,7 +1958,7 @@ void commit(unsigned int core_num)
 
 						//commit store value to D-cache
 						lat = cores[core_num].cache_dl1->cache_access(Write, (contexts[context_id].LSQ[contexts[context_id].LSQ_head].addr&~3),	context_id, NULL, 4, sim_cycle, NULL, NULL);
-						std::cout << "commit_lat: " << lat << std::endl;
+						std::cout << "!!!!!!!!! commit_lat: " << lat << " !!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
 
 						if(lat > cores[core_num].cache_dl1_lat)
 							events |= PEV_CACHEMISS;

@@ -2,6 +2,16 @@
     "files.associations": {
         "memory": "c",
         "random": "c",
-        "optional": "c"
+        "optional": "c",
+        "ostream": "c",
+        "array": "c",
+        "deque": "c",
+        "list": "c",
+        "string": "c",
+        "unordered_map": "c",
+        "vector": "c",
+        "string_view": "c",
+        "initializer_list": "c",
+        "ranges": "c"
     }
 }
