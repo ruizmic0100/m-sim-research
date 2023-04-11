@@ -231,18 +231,15 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	{
 		//access next level of data cache hierarchy
 		unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		std::cout << "access function return latency value: " << lat << std::endl;
 
 		//Wattch -- Dcache2 access
 		cores[contexts[context_id].core_id].power.dcache2_access++;
 
 		if(cmd == Read) {
-			std::cout << "dl1 access returning lat for " << cmd << " cmd" << std::endl;
 			return lat;
 		}
 		else
 		{
-			std::cout << "dl1 access returned 0 for " << cmd << " cmd" << std::endl;
 			//FIXME: unlimited write buffers
 			return 0;
 		}
@@ -273,18 +270,15 @@ dl2_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	{
 		//access next level of data cache hierarchy
 		unsigned long long lat = cache_dl3->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		std::cout << "dl2_access_fn ran" << std::endl;
 
 		//Wattch -- Dcache2 access
 		cores[contexts[context_id].core_id].power.dcache3_access++;
 
 		if (cmd == Read) {
-			std::cout << "dl2_access_fn returned for read cmd" << std::endl;
 			return lat;
 		}
 		else
 		{
-			std::cout << "dl2_access_fn returned for write cmd" << std::endl;
 			//FIXME: unlimited write buffers
 			return 0;
 		}
@@ -1833,6 +1827,7 @@ void readyq_enqueue(ROB_entry *rs)		//RS to enqueue
 }
 
 std::map<tick_t, size_t> assignment_threads;
+int wb_full_cnt = 0;
 
 //COMMIT() - instruction retirement pipeline stage
 
@@ -1958,7 +1953,6 @@ void commit(unsigned int core_num)
 
 						//commit store value to D-cache
 						lat = cores[core_num].cache_dl1->cache_access(Write, (contexts[context_id].LSQ[contexts[context_id].LSQ_head].addr&~3),	context_id, NULL, 4, sim_cycle, NULL, NULL);
-						std::cout << "!!!!!!!!! commit_lat: " << lat << " !!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
 
 						if(lat > cores[core_num].cache_dl1_lat)
 							events |= PEV_CACHEMISS;
@@ -1976,16 +1970,29 @@ void commit(unsigned int core_num)
 
 						write_finish = std::max(write_finish, sim_cycle + lat);
 					}
+
+					if (lat > 1 && cores[core_num].write_buf.size() > 15) {
+						contexts_left.erase(contexts_left.begin()+current_context);
+						continue;
+					}
+
 					cores[core_num].write_buf.insert(write_finish);
 					assert(cores[core_num].write_buf.size() <= cores[core_num].write_buf_size);
 
 					for (std::set<tick_t>::iterator wb_entry = cores[core_num].write_buf.begin(); wb_entry != cores[core_num].write_buf.end(); wb_entry++) {
 						if (assignment_threads.find(*wb_entry) == assignment_threads.end()) {
 							assignment_threads[*wb_entry] = context_id;
-							printf("  ->  ");
+							// printf("  ->  ");
 						}
-						std::cout << "Write_buf entry -> write_finish: " << *wb_entry << "\tassignment_thread: " << assignment_threads[*wb_entry] << std::endl;
+						// std::cout << "Write_buf entry -> write_finish: " << *wb_entry << "\tassignment_thread: " << assignment_threads[*wb_entry] << std::endl;
 					}
+
+					// if (cores[core_num].write_buf.size() > 15) {
+					// 	wb_full_cnt++;
+					// 	std::cout << "wb_full_cnt: " << wb_full_cnt << std::endl;
+					// 	// std::cout << "WB_s: " << cores[core_num].write_buf.size() << std::endl;
+					// }
+
 				}
 				else
 				{
@@ -4735,7 +4742,7 @@ void sim_main()
 	//to eliminate this/next state synchronization and relaxation problems
 	for(;;)
 	{
-		std::cout << "------------------------------ sim cycle " << sim_cycle << " ------------------------------" << std::endl;
+		// std::cout << "------------------------------ sim cycle " << sim_cycle << " ------------------------------" << std::endl;
 		for(int i=0;i<num_contexts;i++)
 		{
 			//ROB/LSQ sanity checks

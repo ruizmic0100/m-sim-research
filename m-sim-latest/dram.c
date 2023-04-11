@@ -56,7 +56,6 @@ unsigned int dram_default::mem_access_latency(md_addr_t addr, int size, tick_t w
 {
 	unsigned int chunks = (size + (bus_width - 1)) / bus_width;
 	assert(chunks > 0);
-	printf("mem_lat %u\tmem_chunk_lat: %u\tchunks: %u\n", mem_lat, mem_chunk_lat, chunks-1);
 	return (mem_lat + (mem_chunk_lat * (chunks - 1)));
 }
 

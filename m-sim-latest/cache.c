@@ -539,7 +539,6 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 
 		//don't replace the block until outstanding misses are satisfied
 		lat = MAX(0, repl->ready - now);
-		std::cout << "Line 541 lat: " << lat << std::endl;
 //		lat += MAX(0, repl->ready - now);
  
 		if(repl->status & CACHE_BLK_DIRTY)
@@ -551,9 +550,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 			if(next_cache)
 			{
 				lat = next_cache->make_next_request(lat) - now;
-				std::cout << "Line 553 lat: " << lat << std::endl;
 				lat = MAX(lat,0);
-				std::cout << "Line 554 lat: " << lat << std::endl;
 				assert(lat>=0);
 			}
 				
@@ -568,7 +565,6 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 //	This can result in out-of-order communications. Is this a problem?
 			//Stall until we can send to the next level of memory
 			lat = MAX(lat, bus_free - now);
-			std::cout << "Line 569 lat: " << lat << std::endl;
 
 			//The communication takes 1 cycle, however, if the block isn't serviced right away
 			//due to pending misses, it stalls the bus too long.
@@ -577,7 +573,6 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 #endif
 			//Add latency needed to write back
 			lat += blk_access_fn(Write, CACHE_MK_BADDR(this, repl->tag, set), bsize, repl, now+lat, context_id);
-			std::cout << "Line 578 lat: " << lat << std::endl;
 		}
 	}
 
@@ -590,29 +585,22 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	if(next_cache)
 	{
 		lat = next_cache->make_next_request(lat) - now;
-		std::cout << "Line 591 lat: " << lat << std::endl;
 		lat = MAX(lat,0);
-		std::cout << "Line 594 lat: " << lat << std::endl;
 		assert(lat>=0);
 	}
 	lat += blk_access_fn(Read, CACHE_BADDR(this, addr), bsize, repl, now+lat, context_id);
-	std::cout << "Line 597 lat: " << lat << std::endl;
 #else
 	//Trying to incorporate bus_free here
 	{
 		long long new_bus_free = bus_free;
 		long long new_lat = MAX(MAX(0,repl->ready - now), new_bus_free - now);
-		std::cout << "new_lat: " << new_lat << std::endl;
 		/* ------------------- Between here is where it jumps up to around 300cc ---------------------- */
 		new_bus_free = 1 + MAX(new_bus_free, (tick_t)(now + new_lat));
-		std::cout << "new_bus_free: " << new_bus_free << std::endl;
 		assert(new_bus_free >= bus_free);
 		bus_free = new_bus_free;
 		new_lat += blk_access_fn(Read, CACHE_BADDR(this, addr), bsize, repl, now+new_lat, context_id);
 		/* ------------------- Between here is where it jumps up to around 300cc ---------------------- */
-		std::cout << "new_lat on line 609: " << new_lat << std::endl;
 		lat = MAX(lat,new_lat);
-		std::cout << "lat on line 610: " << lat << std::endl;
 	}
 
 	//Read the data block (required on all misses, load or store. Writes only occur on write back.
@@ -644,12 +632,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 		link_htab_ent(&sets[set], repl);
 #endif
 
-	if (name == "Core_0_ul2") {
-		std::cout << "LATENCY FOR L2 MISS: " << lat << std::endl;
-	}
-
 	//return latency of the operation
-	std::cout << "return lat: " << lat << std::endl;
 	return lat;
 
 cache_hit:
@@ -681,17 +664,6 @@ cache_hit:
 	{
 		*udata = blk->user_data;
 	}
-
-	// if (name == "Core_0_dl1") {
-	// 	std::cout << "Hit detected on cache: " << name << std::endl;
-	// 	std::cout << "latency: " << MAX(hit_latency, (blk->ready - now)) << std::endl;
-	// }
-
-	if (name == "Core_0_ul2") {
-		std::cout << "Hit detected on ul2 cache: " << name << std::endl;
-		std::cout << "latency: " << MAX(hit_latency, (blk->ready - now)) << std::endl;
-	}
-
 
 	//return first cycle data is available to access
 	return MAX(hit_latency, (blk->ready - now));
