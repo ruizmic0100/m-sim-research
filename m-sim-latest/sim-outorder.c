@@ -1971,10 +1971,11 @@ void commit(unsigned int core_num)
 						write_finish = std::max(write_finish, sim_cycle + lat);
 					}
 
-					if (lat > 1 && cores[core_num].write_buf.size() > 15) {
-						contexts_left.erase(contexts_left.begin()+current_context);
-						continue;
-					}
+					// if (lat > 1 && cores[core_num].write_buf.size() > 8) {
+					// 	std::cout << "Skipping L2 Hits and Above." << "\n";
+					// 	contexts_left.erase(contexts_left.begin()+current_context);
+					// 	continue;
+					// }
 
 					cores[core_num].write_buf.insert(write_finish);
 					assert(cores[core_num].write_buf.size() <= cores[core_num].write_buf_size);

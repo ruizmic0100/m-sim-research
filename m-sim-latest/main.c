@@ -185,7 +185,9 @@ void usage(FILE *fd, int argc, char **argv)
 int running = FALSE;
 
 /**
- * @brief generates a file that holds the total amount of simulation runs.
+ * @brief generates a file that holds the total amount of simulation runs and 
+ * writes sim data to another file.
+ * @attention keep in mind that if the project moves directories; this will have to be updated.
  * @todo attach the config/mix data to this so that we know how each run was ran.
  * 
  * 
@@ -194,7 +196,7 @@ int running = FALSE;
 char* gen_sim_runs_id()
 {
 	int cnt;
-	char total_sim_runs_path[] = "simulation-results/total_sim_runs.txt";
+	char total_sim_runs_path[120] = "/home/ghostrunner/m-sim-research/m-sim-latest/simulation-results/total_sim_runs.txt";
 
 	FILE *total_sim_runs_file = fopen(total_sim_runs_path, "r");
 	if (!total_sim_runs_file) { // Check if the file exists already.
@@ -207,13 +209,12 @@ char* gen_sim_runs_id()
 
 	fscanf(total_sim_runs_file, "%d", &cnt);
 	cnt++;
-
 	fclose(total_sim_runs_file); // close file for read.
 	total_sim_runs_file = fopen(total_sim_runs_path, "w"); // reopen to write.
 	fprintf(total_sim_runs_file, "%d", cnt);
 	fclose(total_sim_runs_file);
 
-	static char simulation_run_path[50] = "simulation-results/run_";
+	static char simulation_run_path[150] = "/home/ghostrunner/m-sim-research/m-sim-latest/simulation-results/run_";
 	// Converting int to string -__
 	char buffer[30]; // Dynamically allocating the size of the buffer.
 	snprintf(buffer, sizeof(buffer), "%d.txt", cnt);
@@ -244,8 +245,7 @@ void sim_print_stats(FILE *fd)
 	//compute simulator memory usag
 	sim_mem_usage = (sbrk(0) - &etext) / 1024;
 #endif
-
-	// freopen(gen_sim_runs_id(), "w", fd); 
+	freopen(gen_sim_runs_id(), "w", fd); 
 	//print simulation stats
 	fprintf(fd, "\nsim: ** simulation statistics **\n");
 	stat_print_stats(sim_sdb, fd);
