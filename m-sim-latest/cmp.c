@@ -17,7 +17,7 @@ core_t::core_t()
 : max_contexts(1),
 	cache_dl1(NULL), cache_il1(NULL), cache_dl2(NULL), cache_il2(NULL),
 	itlb(NULL), dtlb(NULL),
-	sim_slip(0), sim_num_insn_core(0), sim_total_insn(0), sim_num_refs(0), sim_total_refs(0), sim_num_loads(0), sim_total_loads(0), sim_num_branches(0), sim_total_branches(0),
+	sim_slip(0), sim_num_insn_core(0), sim_total_insn(0), sim_num_refs(0), sim_total_refs(0), sim_num_loads(0), sim_total_loads(0), sim_num_branches(0), sim_total_branches(0), write_buffer_full_cnt(0), l1_hits_passedthrough(0),
 	pred_perfect(FALSE),
 	write_buf_size(16),
 	main_mem(NULL),
@@ -70,7 +70,7 @@ core_t::core_t(const core_t & rhs)
 	iq(rhs.iq), fu_CMP(rhs.fu_CMP), fu_pool(rhs.fu_pool),
 
 	sim_slip(rhs.sim_slip), sim_num_insn_core(rhs.sim_num_insn_core), sim_total_insn(rhs.sim_total_insn), sim_num_refs(rhs.sim_num_refs), sim_total_refs(rhs.sim_total_refs),
-	sim_num_loads(rhs.sim_num_loads), sim_total_loads(rhs.sim_total_loads), sim_num_branches(rhs.sim_num_branches), sim_total_branches(rhs.sim_total_branches),
+	sim_num_loads(rhs.sim_num_loads), sim_total_loads(rhs.sim_total_loads), sim_num_branches(rhs.sim_num_branches), sim_total_branches(rhs.sim_total_branches), write_buffer_full_cnt(rhs.write_buffer_full_cnt), l1_hits_passedthrough(rhs.l1_hits_passedthrough),
 	int_regs(rhs.int_regs), fp_regs(rhs.fp_regs),
 
 	commit_width(rhs.commit_width), issue_width(rhs.issue_width), decode_width(rhs.decode_width), fetch_speed(rhs.fetch_speed),
@@ -659,6 +659,9 @@ void core_t::print_stats(FILE * stream, counter_t sim_cycle)
 	{
 		fprintf(stream,"avg_sim_slip_%d                  %f # average slip between issue and retirement\n",  id, (double)sim_slip / (double)sim_num_insn_core);
 	}
+
+	fprintf(stream,"write_buffer_full_cnt_%d              %lld # total amount of times write buffer was full\n", id, write_buffer_full_cnt);
+	fprintf(stream,"l1_hits_passedthrough_%d              %lld # total total number of l1 hits that were passed through at the write buffer during the commit stage\n", id, l1_hits_passedthrough);
 }
 
 void core_t::wait_q_enqueue(ROB_entry *rs, tick_t when)

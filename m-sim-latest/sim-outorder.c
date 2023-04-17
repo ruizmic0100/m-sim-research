@@ -70,6 +70,8 @@
 
 #include "sim-outorder.h"
 
+#define RESERVE_L1_SLOT_IN_WB
+
 // This file implements a very detailed out-of-order issue superscalar processor with a two-level memory system and speculative execution support.
 // This simulator is a performance simulator, tracking the latency of all pipeline operations.
 
@@ -1971,11 +1973,20 @@ void commit(unsigned int core_num)
 						write_finish = std::max(write_finish, sim_cycle + lat);
 					}
 
-					// if (lat > 1 && cores[core_num].write_buf.size() > 8) {
-					// 	std::cout << "Skipping L2 Hits and Above." << "\n";
-					// 	contexts_left.erase(contexts_left.begin()+current_context);
-					// 	continue;
-					// }
+					#ifdef RESERVE_L1_SLOT_IN_WB
+					// Stops any lat values above an l1 hit from clogging the last slot.
+					if (cores[core_num].write_buf.size() == 15 && lat > 1) {
+						//no store ports left, cannot continue to commit insts
+						std::cout << "saving a slot for l1 hits only.\n";
+						contexts_left.erase(contexts_left.begin()+current_context);
+						continue;
+					}
+
+					// Checks if an l1 hit happened while only having one slot left in the wb.
+					if (cores[core_num].write_buf.size() == 15 && lat == 1) {
+						cores[core_num].l1_hits_passedthrough++;
+					}
+					#endif
 
 					cores[core_num].write_buf.insert(write_finish);
 					assert(cores[core_num].write_buf.size() <= cores[core_num].write_buf_size);
@@ -1987,21 +1998,18 @@ void commit(unsigned int core_num)
 						}
 						// std::cout << "Write_buf entry -> write_finish: " << *wb_entry << "\tassignment_thread: " << assignment_threads[*wb_entry] << std::endl;
 					}
-
-					// if (cores[core_num].write_buf.size() > 15) {
-					// 	wb_full_cnt++;
-					// 	std::cout << "wb_full_cnt: " << wb_full_cnt << std::endl;
-					// 	// std::cout << "WB_s: " << cores[core_num].write_buf.size() << std::endl;
-					// }
-
 				}
 				else
 				{
 					//no store ports left, cannot continue to commit insts
+					cores[core_num].write_buffer_full_cnt++;
 					contexts_left.erase(contexts_left.begin()+current_context);
 					continue;
 				}
 			}
+
+			// // Count each time the write buffer was full for statistic purposes.
+			// if (cores[core_num].write_buf.size() == cores[core_num].write_buf_size)
 
 			//invalidate load or store operation
 			cores[core_num].Clear_Entry_From_Queues(&contexts[context_id].LSQ[contexts[context_id].LSQ_head]);
@@ -4741,7 +4749,7 @@ void sim_main()
 	}
 	//main simulator loop, NOTE: the pipe stages are traverse in reverse order
 	//to eliminate this/next state synchronization and relaxation problems
-	for(;;)
+	for(int sim_c=0;sim_c<=10000;sim_c++)
 	{
 		// std::cout << "------------------------------ sim cycle " << sim_cycle << " ------------------------------" << std::endl;
 		for(int i=0;i<num_contexts;i++)

@@ -111,6 +111,8 @@ class core_t
 		counter_t sim_total_loads;			//total number of loads executed
 		counter_t sim_num_branches;			//total number of branches committed
 		counter_t sim_total_branches;			//total number of branches executed
+		counter_t write_buffer_full_cnt;		// total number of times write buffer was full
+		counter_t l1_hits_passedthrough;		// total number of l1 hits that were passed through at the write buffer during the commit stage
 		void print_stats(FILE * stream, counter_t sim_cycle);	//prints statistics to output stream
 
 	//Architectural Register State

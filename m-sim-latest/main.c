@@ -204,7 +204,7 @@ char* gen_sim_runs_id()
 		if (!total_sim_runs_file) return "Couldn't open file"; // Failed to open file location.
 		fprintf(total_sim_runs_file, "%d", 1);
 		fclose(total_sim_runs_file);
-		return "simulation-results/run_1.txt";
+		return "/home/ghostrunner/m-sim-research/m-sim-latest/simulation-results/run_1.txt";
 	}
 
 	fscanf(total_sim_runs_file, "%d", &cnt);
