@@ -1973,17 +1973,21 @@ void commit(unsigned int core_num)
 						write_finish = std::max(write_finish, sim_cycle + lat);
 					}
 
+					std::cout << "lat: " << lat << std::endl;
+					std::cout << "WB Size: " << cores[core_num].write_buf.size() << std::endl;
+
 					#ifdef RESERVE_L1_SLOT_IN_WB
 					// Stops any lat values above an l1 hit from clogging the last slot.
 					if (cores[core_num].write_buf.size() == 15 && lat > 1) {
 						//no store ports left, cannot continue to commit insts
-						std::cout << "saving a slot for l1 hits only.\n";
+						std::cout << "cannot continue to commit insts, reserving one slot for l1 hits" << std::endl;
 						contexts_left.erase(contexts_left.begin()+current_context);
 						continue;
 					}
 
 					// Checks if an l1 hit happened while only having one slot left in the wb.
 					if (cores[core_num].write_buf.size() == 15 && lat == 1) {
+						std::cout << "Let an l1 hit through!" << std::endl;
 						cores[core_num].l1_hits_passedthrough++;
 					}
 					#endif
@@ -1994,14 +1998,15 @@ void commit(unsigned int core_num)
 					for (std::set<tick_t>::iterator wb_entry = cores[core_num].write_buf.begin(); wb_entry != cores[core_num].write_buf.end(); wb_entry++) {
 						if (assignment_threads.find(*wb_entry) == assignment_threads.end()) {
 							assignment_threads[*wb_entry] = context_id;
-							// printf("  ->  ");
+							printf("  ->  ");
 						}
-						// std::cout << "Write_buf entry -> write_finish: " << *wb_entry << "\tassignment_thread: " << assignment_threads[*wb_entry] << std::endl;
+						std::cout << "Write_buf entry -> write_finish: " << *wb_entry << "\tassignment_thread: " << assignment_threads[*wb_entry] << std::endl;
 					}
 				}
 				else
 				{
 					//no store ports left, cannot continue to commit insts
+					std::cout << "No store ports left, cannot continue to commit insts, WB size: " << cores[core_num].write_buf.size() << std::endl;
 					cores[core_num].write_buffer_full_cnt++;
 					contexts_left.erase(contexts_left.begin()+current_context);
 					continue;
@@ -4749,7 +4754,7 @@ void sim_main()
 	}
 	//main simulator loop, NOTE: the pipe stages are traverse in reverse order
 	//to eliminate this/next state synchronization and relaxation problems
-	for(int sim_c=0;sim_c<=10000;sim_c++)
+	for(;;)
 	{
 		// std::cout << "------------------------------ sim cycle " << sim_cycle << " ------------------------------" << std::endl;
 		for(int i=0;i<num_contexts;i++)
@@ -4936,6 +4941,9 @@ void smt_print_stats()
 	//print my STATS
 	std::cerr << "\n******* SMT STATS *******" << std::endl;
 	std::cerr << "THROUGHPUT IPC: " << sim_num_insn/static_cast<double>(sim_cycle) << "\n\n";
+	FILE* throughput_ipc_file_path = fopen("/home/ghostrunner/m-sim-research/m-sim-latest/simulation-results/throughputipc.txt", "a");
+	fprintf(throughput_ipc_file_path, "throughputipc: %f\n", sim_num_insn/static_cast<double>(sim_cycle));
+	fclose(throughput_ipc_file_path);
 
 	for(int i=0;i<num_contexts;i++)
 	{
