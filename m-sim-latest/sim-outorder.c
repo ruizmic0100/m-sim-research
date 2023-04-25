@@ -1829,6 +1829,7 @@ void readyq_enqueue(ROB_entry *rs)		//RS to enqueue
 }
 
 std::map<tick_t, size_t> assignment_threads;
+std::list<tick_t> latency_vals;
 int wb_full_cnt = 0;
 
 //COMMIT() - instruction retirement pipeline stage
@@ -1838,6 +1839,7 @@ int wb_full_cnt = 0;
 //their store data to the data cache at this point as well
 void commit(unsigned int core_num)
 {
+
 	std::vector<int> contexts_left(cores[core_num].context_ids);
 	//Check for commit timeout
 	for(size_t i=0;i<contexts_left.size();i++)
@@ -1955,6 +1957,7 @@ void commit(unsigned int core_num)
 
 						//commit store value to D-cache
 						lat = cores[core_num].cache_dl1->cache_access(Write, (contexts[context_id].LSQ[contexts[context_id].LSQ_head].addr&~3),	context_id, NULL, 4, sim_cycle, NULL, NULL);
+						latency_vals.push_back(lat);
 
 						if(lat > cores[core_num].cache_dl1_lat)
 							events |= PEV_CACHEMISS;
@@ -1973,21 +1976,20 @@ void commit(unsigned int core_num)
 						write_finish = std::max(write_finish, sim_cycle + lat);
 					}
 
-					std::cout << "lat: " << lat << std::endl;
-					std::cout << "WB Size: " << cores[core_num].write_buf.size() << std::endl;
+					// std::cout << "WB Size: " << cores[core_num].write_buf.size() << std::endl;
 
 					#ifdef RESERVE_L1_SLOT_IN_WB
 					// Stops any lat values above an l1 hit from clogging the last slot.
 					if (cores[core_num].write_buf.size() == 15 && lat > 1) {
 						//no store ports left, cannot continue to commit insts
-						std::cout << "cannot continue to commit insts, reserving one slot for l1 hits" << std::endl;
+						// std::cout << "cannot continue to commit insts, reserving one slot for l1 hits" << std::endl;
 						contexts_left.erase(contexts_left.begin()+current_context);
 						continue;
 					}
 
 					// Checks if an l1 hit happened while only having one slot left in the wb.
 					if (cores[core_num].write_buf.size() == 15 && lat == 1) {
-						std::cout << "Let an l1 hit through!" << std::endl;
+						// std::cout << "Let an l1 hit through!" << std::endl;
 						cores[core_num].l1_hits_passedthrough++;
 					}
 					#endif
@@ -1998,15 +2000,15 @@ void commit(unsigned int core_num)
 					for (std::set<tick_t>::iterator wb_entry = cores[core_num].write_buf.begin(); wb_entry != cores[core_num].write_buf.end(); wb_entry++) {
 						if (assignment_threads.find(*wb_entry) == assignment_threads.end()) {
 							assignment_threads[*wb_entry] = context_id;
-							printf("  ->  ");
+							// printf("  ->  ");
 						}
-						std::cout << "Write_buf entry -> write_finish: " << *wb_entry << "\tassignment_thread: " << assignment_threads[*wb_entry] << std::endl;
+						// std::cout << "Write_buf entry -> write_finish: " << *wb_entry << "\tassignment_thread: " << assignment_threads[*wb_entry] << std::endl;
 					}
 				}
 				else
 				{
 					//no store ports left, cannot continue to commit insts
-					std::cout << "No store ports left, cannot continue to commit insts, WB size: " << cores[core_num].write_buf.size() << std::endl;
+					// std::cout << "No store ports left, cannot continue to commit insts, WB size: " << cores[core_num].write_buf.size() << std::endl;
 					cores[core_num].write_buffer_full_cnt++;
 					contexts_left.erase(contexts_left.begin()+current_context);
 					continue;
@@ -2106,6 +2108,8 @@ void commit(unsigned int core_num)
 		committed++;
 		contexts[context_id].last_commit_cycle = sim_cycle;
 	}
+
+	
 }
 
 // WRITEBACK() - instruction result writeback pipeline stage
@@ -4571,6 +4575,12 @@ void sim_main()
 	}
 #endif
 
+	char latency_vals_file_path[120] = "/home/ghostrunner/m-sim-research/m-sim-latest/simulation-results/latency_values.txt";
+
+	FILE* latency_vals_file = fopen(latency_vals_file_path, "a");
+
+	if (!latency_vals_file) std::cout << "Couldn't open latency_vals_file" << "\n";
+
 	//ignore any floating point exceptions, they may occur on mis-speculated execution paths
 	signal(SIGFPE, SIG_IGN);
 	signal(SIGSEGV, segfault_handler);
@@ -4912,6 +4922,16 @@ void sim_main()
 		{
 			if(contexts[i].sim_num_insn >= max_insts)
 			{
+				latency_vals.sort();
+				fprintf(latency_vals_file, "---------- START ----------\n");
+				for (auto it = latency_vals.begin(); it != latency_vals.end(); it++) {
+					if (*it != *std::prev(it)) fprintf(latency_vals_file, "\n");
+					fprintf(latency_vals_file, "%d,", *it);
+				}
+
+				fprintf(latency_vals_file, "\n\n---------- END ----------\n");
+
+				fclose(latency_vals_file);
 				return;
 			}
 		}
@@ -4919,11 +4939,28 @@ void sim_main()
 		//If we reached the desired number of cycles
 		if(sim_cycle==max_cycles)
 		{
+			latency_vals.sort();
+			fprintf(latency_vals_file, "---------- START ----------\n");
+			for (auto it = latency_vals.begin(); it != latency_vals.end(); it++) {
+				fprintf(latency_vals_file, "%d,", *it);
+			}
+
+			fprintf(latency_vals_file, "---------- END ----------\n");
+
+			fclose(latency_vals_file);
 			return;
 		}
 
 		if(empty_cores == cores.size())
 		{
+			latency_vals.sort();
+			fprintf(latency_vals_file, "---------- START ----------\n");
+			for (auto it = latency_vals.begin(); it != latency_vals.end(); it++) {
+				fprintf(latency_vals_file, "%d,", *it);
+			}
+
+			fprintf(latency_vals_file, "---------- END ----------\n");
+			fclose(latency_vals_file);
 			return;
 		}
 	}
