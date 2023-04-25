@@ -229,6 +229,7 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	tick_t now,			//time of access
 	int context_id)			//context_id for the access
 {
+	// std::cout << "dl1_access_fn ran" << std::endl;
 	if(cores[contexts[context_id].core_id].cache_dl2)
 	{
 		//access next level of data cache hierarchy
@@ -268,6 +269,7 @@ dl2_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	tick_t now,			//time of access
 	int context_id)			//context_id for the access
 {
+	// std::cout << "dl2_access_fn ran" << std::endl;
 	if(cache_dl3)
 	{
 		//access next level of data cache hierarchy
@@ -308,7 +310,7 @@ dl3_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	int context_id)			//context id
 {
 	//Wattch -- main memory access -- Wattch-FIXME (offchip)
-	std::cout << "dl3_access_fn ran" << std::endl;
+	// std::cout << "dl3_access_fn ran !!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
 
 	//this is a miss to the lowest level, so access main memory
 	if(cmd == Read) {
@@ -1881,6 +1883,7 @@ void commit(unsigned int core_num)
 		int context_id = contexts_left[current_context];
 		int events = 0;
 		int lat;		//latency and default commit events
+		int cache_lat = 0;
 
 		if(contexts[context_id].ROB_num<=0)
 		{
@@ -1957,6 +1960,7 @@ void commit(unsigned int core_num)
 
 						//commit store value to D-cache
 						lat = cores[core_num].cache_dl1->cache_access(Write, (contexts[context_id].LSQ[contexts[context_id].LSQ_head].addr&~3),	context_id, NULL, 4, sim_cycle, NULL, NULL);
+						cache_lat = lat;
 						latency_vals.push_back(lat);
 
 						if(lat > cores[core_num].cache_dl1_lat)
@@ -1972,15 +1976,14 @@ void commit(unsigned int core_num)
 							context_id, NULL, 4, sim_cycle, NULL, NULL);
 						if(lat > 1)
 							events |= PEV_TLBMISS;
-
 						write_finish = std::max(write_finish, sim_cycle + lat);
 					}
 
-					// std::cout << "WB Size: " << cores[core_num].write_buf.size() << std::endl;
 
 					#ifdef RESERVE_L1_SLOT_IN_WB
+					// >15 no reserve slots, >14 1 reserved slots, >13 2 reserved slots, etc.
 					// Stops any lat values above an l1 hit from clogging the last slot.
-					if (cores[core_num].write_buf.size() == 15 && lat > 1) {
+					if (cores[core_num].write_buf.size() > 14 && cache_lat > 1) {
 						//no store ports left, cannot continue to commit insts
 						// std::cout << "cannot continue to commit insts, reserving one slot for l1 hits" << std::endl;
 						contexts_left.erase(contexts_left.begin()+current_context);
@@ -1988,7 +1991,7 @@ void commit(unsigned int core_num)
 					}
 
 					// Checks if an l1 hit happened while only having one slot left in the wb.
-					if (cores[core_num].write_buf.size() == 15 && lat == 1) {
+					if (cores[core_num].write_buf.size() > 14 && cache_lat == 1) {
 						// std::cout << "Let an l1 hit through!" << std::endl;
 						cores[core_num].l1_hits_passedthrough++;
 					}
@@ -1996,6 +1999,9 @@ void commit(unsigned int core_num)
 
 					cores[core_num].write_buf.insert(write_finish);
 					assert(cores[core_num].write_buf.size() <= cores[core_num].write_buf_size);
+
+
+					// std::cout << "WB Size: " << cores[core_num].write_buf.size() << std::endl;
 
 					for (std::set<tick_t>::iterator wb_entry = cores[core_num].write_buf.begin(); wb_entry != cores[core_num].write_buf.end(); wb_entry++) {
 						if (assignment_threads.find(*wb_entry) == assignment_threads.end()) {
