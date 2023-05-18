@@ -1,0 +1,8 @@
+throughputipc: 1.625105
+throughputipc: 1.724443
+throughputipc: 0.938183
+throughputipc: 0.822502
+throughputipc: 2.477063
+throughputipc: 3.418791
+throughputipc: 0.959811
+throughputipc: 0.992942
