@@ -88,7 +88,7 @@
 
 #include "sim-outorder.h"
 
-#define RESERVE_L1_SLOT_IN_WB
+//#define RESERVE_L1_SLOT_IN_WB
 
 
 /*
@@ -319,6 +319,46 @@ dl2_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	}
 }
 
+// Victim Cache inbetween L2-L3 block miss handler function
+// TODO(MSR): Make this not act like just an L2
+unsigned long long victim_dl2_access_fn (
+					mem_cmd cmd, 		// access cmd, Read or Write
+					md_addr_t baddr, 	// block address to access
+					unsigned int bsize, // size of block to access
+					cache_blk_t *blk,   // ptr to block in upper level
+					tick_t now, 		// time of access
+					int context_id		// context id
+										)
+{
+	if(cache_dl3)
+	{
+		//access next level of data cache hierarchy
+		unsigned long long lat = cache_dl3->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+
+		//Wattch -- Dcache2 access
+		cores[contexts[context_id].core_id].power.dcache3_access++;
+
+		if (cmd == Read)
+			return lat;
+		else
+		{
+			//FIXME: unlimited write buffers
+			return 0;
+		}
+	}
+	else
+	{
+		//access main memory
+		if(cmd == Read)
+			return cores[contexts[context_id].core_id].main_mem->mem_access_latency(baddr, bsize, now, context_id);
+		else
+		{
+			//FIXME: unlimited write buffers
+			return 0;
+		}
+	}
+}
+
 //l3 data cache block miss handler function
 unsigned long long			//latency of block access
 dl3_access_fn(mem_cmd cmd,		//access cmd, Read or Write
@@ -380,6 +420,40 @@ il2_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	cache_blk_t *blk,		//ptr to block in upper level
 	tick_t now,			//time of access
 	int context_id)			//context_id of the access
+{
+	if(cache_il3)
+	{
+		//access next level of inst cache hierarchy
+		unsigned long long lat = cache_il3->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+
+		//Wattch -- Dcache2 access
+		cores[contexts[context_id].core_id].power.dcache3_access++;
+
+		if(cmd == Read)
+			return lat;
+		else
+			panic("writes to instruction memory not supported");
+	}
+	else
+	{
+		//access main memory
+		if(cmd == Read)
+			return cores[contexts[context_id].core_id].main_mem->mem_access_latency(baddr, bsize, now, context_id);
+		else
+			panic("writes to instruction memory not supported");
+	}
+}
+
+// Victim Cache inst cache block miss handler function
+unsigned long long victim_il2_access_fn
+( 	//latency of block access
+	mem_cmd cmd,			//access cmd, Read or Write
+	md_addr_t baddr,		//block address to access
+	unsigned int bsize,		//size of block to access
+	cache_blk_t *blk,		//ptr to block in upper level
+	tick_t now,				//time of access
+	int context_id  		//context_id of the access
+)			
 {
 	if(cache_il3)
 	{
@@ -716,6 +790,16 @@ void sim_reg_options(opt_odb_t *odb)
 			&cores[i].cache_dl2_lat, /* default */10,
 			/* print */TRUE, /* format */NULL);
 
+		opt_reg_string(odb, "-cache_victim:dl2",offset,
+			 "victim cache inbetween L2-L3 data cache config, i.e., {<config>|none}",
+			 &cores[i].cache_victim_dl2_opt, "ul2:512:64:16:l",
+			 /* print */TRUE, NULL);
+
+		opt_reg_int(odb, "-cache_victim:dl2lat",offset,
+			"victim cache inbetween L2-L3 data cache hit latency (in cycles)",
+			&cores[i].cache_victim_dl2_lat, /* default */50,
+			/* print */TRUE, /* format */NULL);
+
 		opt_reg_string(odb, "-cache:il1",offset,
 			"l1 inst cache config, i.e., {<config>|dl1|dl2|none}",
 			&cores[i].cache_il1_opt, "il1:512:64:2:l",
@@ -734,6 +818,16 @@ void sim_reg_options(opt_odb_t *odb)
 		opt_reg_int(odb, "-cache:il2lat",offset,
 			"l2 instruction cache hit latency (in cycles)",
 			&cores[i].cache_il2_lat, /* default */10,
+			/* print */TRUE, /* format */NULL);
+
+		opt_reg_string(odb, "-cache_victim:il2",offset,
+			"victim cache inbetween L2-L3 instruction cache config, i.e., {<config>|dl2|none}",
+			&cores[i].cache_victim_il2_opt, "victim_dl2",
+			/* print */TRUE, NULL);
+
+		opt_reg_int(odb, "-cache_victim:il2lat",offset,
+			"victim cache inbetween L2-L3 instruction cache hit latency (in cycles)",
+			&cores[i].cache_victim_il2_lat, /* default */50,
 			/* print */TRUE, /* format */NULL);
 
 		//TLB options
@@ -1034,6 +1128,12 @@ void sim_check_options()
 			assert(0);
 		}
 
+		if(cores[i].cache_victim_dl2_lat < 1)
+		{
+			printf("Core %d Victim L2-L3 data cache latency must be greater than zero",i);
+			assert(0);
+		}
+
 		if(cores[i].cache_il1_lat < 1)
 		{
 			printf("Core %d L1 instruction cache latency must be greater than zero",i);
@@ -1043,6 +1143,12 @@ void sim_check_options()
 		if(cores[i].cache_il2_lat < 1)
 		{
 			printf("Core %d L2 instruction cache latency must be greater than zero",i);
+			assert(0);
+		}
+
+		if(cores[i].cache_victim_il2_lat < 1)
+		{
+			printf("Core %d Victim L2-L3 instruction cache latency must be greater than zero",i);
 			assert(0);
 		}
 
@@ -1311,6 +1417,13 @@ void sim_check_options()
 					fatal("bad l2 D-cache parms: " "<name>:<nsets>:<bsize>:<assoc>:<repl>");
 				cores[i].cache_dl2 = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
 					dl2_access_fn, /* hit lat */cores[i].cache_dl2_lat);
+				
+				// NOTE(MSR): Creating victim cache here after l2 is created.
+				// WARN(MSR): Make sure it is a fully associative cache policy is set.
+				if (sscanf(cores[i].cache_victim_dl2_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
+					fatal("bad l2->l3 victim D-cache parm: " "<name>:<nsets>:<bsize>:<assoc>:<repl>");
+				cores[i].cache_victim_dl2 = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
+					victim_dl2_access_fn, /* hit lat */cores[i].cache_victim_dl2_lat);
 			}
 		}
 
@@ -1367,6 +1480,11 @@ void sim_check_options()
 					fatal("bad l2 I-cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
 				cores[i].cache_il2 = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
 					il2_access_fn, /* hit lat */cores[i].cache_il2_lat);
+
+				if (sscanf(cores[i].cache_victim_il2_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
+					fatal("bad victim I2-cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
+				cores[i].cache_victim_il2 = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
+					victim_il2_access_fn, /* hit lat */cores[i].cache_victim_il2_lat);
 			}
 		}
 
@@ -1544,6 +1662,7 @@ void sim_reg_stats(stat_sdb_t *sdb)
 	}
 }
 
+
 //initialize the simulator
 void sim_init()
 {}
@@ -1643,8 +1762,10 @@ void sim_aux_stats(FILE *stream)
 	{
 		caches.insert(cores[i].cache_il1);
 		caches.insert(cores[i].cache_il2);
+		caches.insert(cores[i].cache_victim_il2);
 		caches.insert(cores[i].cache_dl1);
 		caches.insert(cores[i].cache_dl2);
+		caches.insert(cores[i].cache_victim_dl2);
 		caches.insert(cores[i].itlb);
 		caches.insert(cores[i].dtlb);
 	}
@@ -1679,8 +1800,10 @@ void sim_uninit()
 	{
 		caches.insert(cores[i].cache_il1);
 		caches.insert(cores[i].cache_il2);
+		caches.insert(cores[i].cache_victim_il2);
 		caches.insert(cores[i].cache_dl1);
 		caches.insert(cores[i].cache_dl2);
+		caches.insert(cores[i].cache_victim_dl2);
 		caches.insert(cores[i].itlb);
 		caches.insert(cores[i].dtlb);
 	}
@@ -4614,6 +4737,12 @@ void sim_main()
 		}
 		if(cores[i].cache_dl2){
 			cores[i].cache_dl2->reset_cache_stats();
+		}
+		if(cores[i].cache_victim_il2){
+			cores[i].cache_victim_il2->reset_cache_stats();
+		}
+		if(cores[i].cache_victim_dl2){
+			cores[i].cache_victim_dl2->reset_cache_stats();
 		}
 		if(cores[i].itlb){
 			cores[i].itlb->reset_cache_stats();

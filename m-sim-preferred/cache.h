@@ -209,6 +209,8 @@ class cache_t
 		unsigned long long cache_flush_addr(md_addr_t addr,	//address of block to flush
 			tick_t now);					//time of cache flush
 
+		void display_caches(md_addr_t addr, md_addr_t set, md_addr_t bofs);
+
 	private:
 #ifdef USE_HASH
 		//insert BLK onto the head of the hash table bucket chain in SET

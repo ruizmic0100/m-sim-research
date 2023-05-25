@@ -453,6 +453,34 @@ void cache_t::print_stats(FILE *stream)
 	}
 }
 
+// Display the cache structures
+void cache_t::display_caches(md_addr_t addr, md_addr_t set, md_addr_t bofs)
+{
+	std::cout << "\n\nCache Structures for " << this->name << "\n";
+	std::cout << "nsets: " << this->nsets << "\tbsize: " << this->bsize << "\n";
+
+
+	for(blk=sets[set].way_head;blk;blk=blk->way_next)
+	{
+		if(blk->tag == tag && (blk->status & CACHE_BLK_VALID) && (blk->context_id == context_id))
+			goto cache_hit;
+	}
+
+	for (int sets_y = 0; sets_y < this->nsets; sets_y++) {
+		std::cout << sets_y << "\t";
+
+		for (int block_x = 0; block_x < this->bsize; block_x++) {
+			if (block_x == bofs && sets_y == set) {
+				std::cout << "[■]";
+			} else {
+				std::cout << "[ ]";
+			}
+		}
+
+		std::cout << std::endl;
+	}
+}
+
 //access a cache, perform a CMD operation the cache at address ADDR, places NBYTES of 
 //	data at *P, returns latency of operation if initiated at NOW (in cycles), places pointer 
 //	to block user data in *UDATA, *P is untouched if cache blocks are not allocated
@@ -470,7 +498,13 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	md_addr_t tag = CACHE_TAG(this, addr);
 	md_addr_t set = CACHE_SET(this, addr);
 	md_addr_t bofs = CACHE_BLK(this, addr);
+	std::cout << "\n\n";
+	std::cout << "set: " << set << std::endl;
+	std::cout << "bofs: " << set << std::endl;
+	std::cout << "\n\n";
 	long long lat = 0;
+
+	display_caches(addr, set, bofs);
 
 	//default replacement address
 	if(repl_addr)
