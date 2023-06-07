@@ -4,6 +4,12 @@
         "string_view": "c",
         "initializer_list": "c",
         "ranges": "c",
-        "utility": "c"
+        "utility": "c",
+        "*.tcc": "c",
+        "fstream": "c",
+        "iomanip": "c",
+        "istream": "c",
+        "ostream": "c",
+        "streambuf": "c"
     }
 }

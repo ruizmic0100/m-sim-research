@@ -141,6 +141,7 @@ class cache_blk_t
 };
 
 //cache set definition (one or more blocks sharing the same set index)
+// TODO(MSR): This needs a size() function
 class cache_set_t
 {
 	public:

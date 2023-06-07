@@ -15,7 +15,7 @@
 
 core_t::core_t()
 : max_contexts(1),
-	cache_dl1(NULL), cache_il1(NULL), cache_dl2(NULL), cache_il2(NULL), cache_victim_dl2(NULL), cache_victim_il2(NULL),
+	cache_dl1(NULL), cache_il1(NULL), cache_dl2(NULL), cache_il2(NULL), cache_dvictim(NULL), cache_ivictim(NULL),
 	itlb(NULL), dtlb(NULL),
 	sim_slip(0), sim_num_insn_core(0), sim_total_insn(0), sim_num_refs(0), sim_total_refs(0), sim_num_loads(0), sim_total_loads(0), sim_num_branches(0), sim_total_branches(0), l1_hits_passedthrough(0),
 	pred_perfect(FALSE),
@@ -53,10 +53,10 @@ core_t::core_t()
 core_t::core_t(const core_t & rhs)
 : id(rhs.id), max_contexts(rhs.max_contexts), power(rhs.power),
 	context_ids(rhs.context_ids),
-	cache_dl1(rhs.cache_dl1), cache_il1(rhs.cache_il1), cache_dl2(rhs.cache_dl2), cache_il2(rhs.cache_il2), cache_victim_dl2(rhs.cache_victim_dl2), cache_victim_il2(rhs.cache_victim_il2),
+	cache_dl1(rhs.cache_dl1), cache_il1(rhs.cache_il1), cache_dl2(rhs.cache_dl2), cache_il2(rhs.cache_il2), cache_dvictim(rhs.cache_dvictim), cache_ivictim(rhs.cache_ivictim),
 	itlb(rhs.itlb), dtlb(rhs.dtlb),
 
-	cache_dl1_lat(rhs.cache_dl1_lat), cache_il1_lat(rhs.cache_il1_lat), cache_dl2_lat(rhs.cache_dl2_lat), cache_il2_lat(rhs.cache_il2_lat), cache_victim_dl2_lat(rhs.cache_victim_dl2_lat), cache_victim_il2_lat(rhs.cache_victim_il2_lat),
+	cache_dl1_lat(rhs.cache_dl1_lat), cache_il1_lat(rhs.cache_il1_lat), cache_dl2_lat(rhs.cache_dl2_lat), cache_il2_lat(rhs.cache_il2_lat), cache_dvictim_lat(rhs.cache_dvictim_lat), cache_ivictim_lat(rhs.cache_ivictim_lat),
 	tlb_miss_lat(rhs.tlb_miss_lat),
 
 	bpred_misprediction_penalty(rhs.bpred_misprediction_penalty),
@@ -85,7 +85,7 @@ core_t::core_t(const core_t & rhs)
 
 	write_buf_size(rhs.write_buf_size), write_buf(rhs.write_buf),
 
-	cache_dl1_opt(rhs.cache_dl1_opt), cache_dl2_opt(rhs.cache_dl2_opt), cache_il1_opt(rhs.cache_il1_opt), cache_il2_opt(rhs.cache_il2_opt), cache_victim_dl2_opt(rhs.cache_victim_dl2_opt), cache_victim_il2_opt(rhs.cache_victim_il2_opt), itlb_opt(rhs.itlb_opt), dtlb_opt(rhs.dtlb_opt),
+	cache_dl1_opt(rhs.cache_dl1_opt), cache_dl2_opt(rhs.cache_dl2_opt), cache_il1_opt(rhs.cache_il1_opt), cache_il2_opt(rhs.cache_il2_opt), cache_dvictim_opt(rhs.cache_dvictim_opt), cache_ivictim_opt(rhs.cache_ivictim_opt), itlb_opt(rhs.itlb_opt), dtlb_opt(rhs.dtlb_opt),
 
 	pred_type(rhs.pred_type), cpred_type(rhs.cpred_type), ras_size(rhs.ras_size), cras_size(rhs.cras_size), bpred_spec_opt(rhs.bpred_spec_opt), bpred_spec_update(rhs.bpred_spec_update),
 	main_mem(rhs.main_mem), main_mem_config(rhs.main_mem_config),

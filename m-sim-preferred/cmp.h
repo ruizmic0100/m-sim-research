@@ -39,12 +39,12 @@ class core_t
 		cache_t *cache_dl1,*cache_il1;
 		cache_t *cache_dl2,*cache_il2;
 		cache_t *itlb,*dtlb;
-		cache_t *cache_victim_dl2, *cache_victim_il2; // Victim Cache inbetween L2-L3
+		cache_t *cache_dvictim, *cache_ivictim; // Victim Cache inbetween L1-L2
 
 		//Cache Latencies: In cycles. TLB latency is shared amongst both TLBs
 		int cache_dl1_lat, cache_il1_lat;
 		int cache_dl2_lat, cache_il2_lat;
-		int cache_victim_dl2_lat, cache_victim_il2_lat;
+		int cache_dvictim_lat, cache_ivictim_lat;
 		int tlb_miss_lat;
 
 		//Branch misprediction penalty
@@ -187,7 +187,7 @@ class core_t
 
 		char *cache_dl1_opt, *cache_dl2_opt;		//L1 and L2 D-cache config, i.e., {<config>|none}
 		char *cache_il1_opt, *cache_il2_opt;		//L1 and L2 I-cache config, i.e., {<config>|dl1|dl2|dl3|none}
-		char *cache_victim_dl2_opt, *cache_victim_il2_opt;  // Victim cache for L2->L3 config
+		char *cache_dvictim_opt, *cache_ivictim_opt;  // Victim cache for L1->L2 config
 		char *itlb_opt, *dtlb_opt;			//i-TLB and d-TLB config, i.e., {<config>|none}
 
 		

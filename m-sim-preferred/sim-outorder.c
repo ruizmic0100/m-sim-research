@@ -253,6 +253,55 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	int context_id)			//context_id for the access
 {
 	if(cores[contexts[context_id].core_id].cache_dl2)
+	{ 
+		// Globably instantiating this here incase memory is written correctly.
+		//This is probably a bad practice due to the default value potentially being used at wrong times.
+		unsigned long long lat = 0;
+
+		//access next level of data cache hierarchy but first checking the victim cache
+		if (cores[contexts[context_id].core_id].cache_dvictim) {
+			unsigned long long lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		} else {
+			unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		}
+
+		//Wattch -- Dcache2 access
+		// TODO(MSR): Fix this and add it for victim_cache. This is also probably screwing up the power access for dcache2.
+		cores[contexts[context_id].core_id].power.dcache2_access++;
+
+		if(cmd == Read)
+			return lat;
+		else
+		{
+			//FIXME: unlimited write buffers
+			return 0;
+		}
+	}
+	else
+	{
+		//access main memory
+		if(cmd == Read)
+			return cores[contexts[context_id].core_id].main_mem->mem_access_latency(baddr, bsize, now, context_id);
+		else
+		{
+			//FIXME: unlimited write buffers
+			return 0;
+		}
+	}
+}
+
+// Victim Cache inbetween L1-L2 block miss handler function
+// TODO(MSR): Make this act like just an L1 but wayyyy smaller 16 blocks
+unsigned long long dvictim_access_fn (
+					mem_cmd cmd, 		// access cmd, Read or Write
+					md_addr_t baddr, 	// block address to access
+					unsigned int bsize, // size of block to access
+					cache_blk_t *blk,   // ptr to block in upper level
+					tick_t now, 		// time of access
+					int context_id		// context id
+										)
+{
+	if(cores[contexts[context_id].core_id].cache_dvictim)
 	{
 		//access next level of data cache hierarchy
 		unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
@@ -319,45 +368,6 @@ dl2_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	}
 }
 
-// Victim Cache inbetween L2-L3 block miss handler function
-// TODO(MSR): Make this not act like just an L2
-unsigned long long victim_dl2_access_fn (
-					mem_cmd cmd, 		// access cmd, Read or Write
-					md_addr_t baddr, 	// block address to access
-					unsigned int bsize, // size of block to access
-					cache_blk_t *blk,   // ptr to block in upper level
-					tick_t now, 		// time of access
-					int context_id		// context id
-										)
-{
-	if(cache_dl3)
-	{
-		//access next level of data cache hierarchy
-		unsigned long long lat = cache_dl3->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-
-		//Wattch -- Dcache2 access
-		cores[contexts[context_id].core_id].power.dcache3_access++;
-
-		if (cmd == Read)
-			return lat;
-		else
-		{
-			//FIXME: unlimited write buffers
-			return 0;
-		}
-	}
-	else
-	{
-		//access main memory
-		if(cmd == Read)
-			return cores[contexts[context_id].core_id].main_mem->mem_access_latency(baddr, bsize, now, context_id);
-		else
-		{
-			//FIXME: unlimited write buffers
-			return 0;
-		}
-	}
-}
 
 //l3 data cache block miss handler function
 unsigned long long			//latency of block access
@@ -388,6 +398,48 @@ il1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	cache_blk_t *blk,		//ptr to block in upper level
 	tick_t now,			//time of access
 	int context_id)			//context_id of the access
+{
+	if(cores[contexts[context_id].core_id].cache_il2)
+	{
+		// Globably instantiating this here incase memory is written correctly.
+		//This is probably a bad practice due to the default value potentially being used at wrong times.
+		unsigned long long lat = 0; 
+
+		//access next level of data cache hierarchy
+		if (cores[contexts[context_id].core_id].cache_dvictim) {
+			unsigned long long lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		} else {
+			unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		}
+
+		//Wattch -- Dcache2 access
+		cores[contexts[context_id].core_id].power.dcache2_access++;
+
+		if(cmd == Read)
+			return lat;
+		else
+			panic("writes to instruction memory not supported");
+	}
+	else
+	{
+		//access main memory
+		if(cmd == Read)
+			return cores[contexts[context_id].core_id].main_mem->mem_access_latency(baddr, bsize, now, context_id);
+		else
+			panic("writes to instruction memory not supported");
+	}
+}
+
+// Victim Cache inst cache block miss handler function
+unsigned long long ivictim_access_fn
+( 	//latency of block access
+	mem_cmd cmd,			//access cmd, Read or Write
+	md_addr_t baddr,		//block address to access
+	unsigned int bsize,		//size of block to access
+	cache_blk_t *blk,		//ptr to block in upper level
+	tick_t now,				//time of access
+	int context_id  		//context_id of the access
+)			
 {
 	if(cores[contexts[context_id].core_id].cache_il2)
 	{
@@ -444,39 +496,6 @@ il2_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	}
 }
 
-// Victim Cache inst cache block miss handler function
-unsigned long long victim_il2_access_fn
-( 	//latency of block access
-	mem_cmd cmd,			//access cmd, Read or Write
-	md_addr_t baddr,		//block address to access
-	unsigned int bsize,		//size of block to access
-	cache_blk_t *blk,		//ptr to block in upper level
-	tick_t now,				//time of access
-	int context_id  		//context_id of the access
-)			
-{
-	if(cache_il3)
-	{
-		//access next level of inst cache hierarchy
-		unsigned long long lat = cache_il3->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-
-		//Wattch -- Dcache2 access
-		cores[contexts[context_id].core_id].power.dcache3_access++;
-
-		if(cmd == Read)
-			return lat;
-		else
-			panic("writes to instruction memory not supported");
-	}
-	else
-	{
-		//access main memory
-		if(cmd == Read)
-			return cores[contexts[context_id].core_id].main_mem->mem_access_latency(baddr, bsize, now, context_id);
-		else
-			panic("writes to instruction memory not supported");
-	}
-}
 
 //l3 inst cache block miss handler function
 unsigned long long			//latency of block access
@@ -790,14 +809,14 @@ void sim_reg_options(opt_odb_t *odb)
 			&cores[i].cache_dl2_lat, /* default */10,
 			/* print */TRUE, /* format */NULL);
 
-		opt_reg_string(odb, "-cache_victim:dl2",offset,
-			 "victim cache inbetween L2-L3 data cache config, i.e., {<config>|none}",
-			 &cores[i].cache_victim_dl2_opt, "ul2:512:64:16:l",
+		opt_reg_string(odb, "-cache_victim:d",offset,
+			 "victim cache inbetween L1-L2 data cache config, i.e., {<config>|none}",
+			 &cores[i].cache_dvictim_opt, "victim:4096:64:1:f",
 			 /* print */TRUE, NULL);
 
-		opt_reg_int(odb, "-cache_victim:dl2lat",offset,
-			"victim cache inbetween L2-L3 data cache hit latency (in cycles)",
-			&cores[i].cache_victim_dl2_lat, /* default */50,
+		opt_reg_int(odb, "-cache_victim:dlat",offset,
+			"victim cache inbetween L1-L2 data cache hit latency (in cycles)",
+			&cores[i].cache_dvictim_lat, /* default */10,
 			/* print */TRUE, /* format */NULL);
 
 		opt_reg_string(odb, "-cache:il1",offset,
@@ -820,14 +839,14 @@ void sim_reg_options(opt_odb_t *odb)
 			&cores[i].cache_il2_lat, /* default */10,
 			/* print */TRUE, /* format */NULL);
 
-		opt_reg_string(odb, "-cache_victim:il2",offset,
-			"victim cache inbetween L2-L3 instruction cache config, i.e., {<config>|dl2|none}",
-			&cores[i].cache_victim_il2_opt, "victim_dl2",
+		opt_reg_string(odb, "-cache_victim:i",offset,
+			"victim cache inbetween L1-L2 instruction cache config, i.e., {<config>|dl2|none}",
+			&cores[i].cache_ivictim_opt, "victim",
 			/* print */TRUE, NULL);
 
-		opt_reg_int(odb, "-cache_victim:il2lat",offset,
-			"victim cache inbetween L2-L3 instruction cache hit latency (in cycles)",
-			&cores[i].cache_victim_il2_lat, /* default */50,
+		opt_reg_int(odb, "-cache_victim:ilat",offset,
+			"victim cache inbetween L1-L2 instruction cache hit latency (in cycles)",
+			&cores[i].cache_ivictim_lat, /* default */10,
 			/* print */TRUE, /* format */NULL);
 
 		//TLB options
@@ -1128,9 +1147,9 @@ void sim_check_options()
 			assert(0);
 		}
 
-		if(cores[i].cache_victim_dl2_lat < 1)
+		if(cores[i].cache_dvictim_lat < 1)
 		{
-			printf("Core %d Victim L2-L3 data cache latency must be greater than zero",i);
+			printf("Core %d Victim L1-L2 data cache latency must be greater than zero",i);
 			assert(0);
 		}
 
@@ -1146,9 +1165,9 @@ void sim_check_options()
 			assert(0);
 		}
 
-		if(cores[i].cache_victim_il2_lat < 1)
+		if(cores[i].cache_ivictim_lat < 1)
 		{
-			printf("Core %d Victim L2-L3 instruction cache latency must be greater than zero",i);
+			printf("Core %d Victim L1-L2 instruction cache latency must be greater than zero",i);
 			assert(0);
 		}
 
@@ -1420,10 +1439,10 @@ void sim_check_options()
 				
 				// NOTE(MSR): Creating victim cache here after l2 is created.
 				// WARN(MSR): Make sure it is a fully associative cache policy is set.
-				if (sscanf(cores[i].cache_victim_dl2_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
-					fatal("bad l2->l3 victim D-cache parm: " "<name>:<nsets>:<bsize>:<assoc>:<repl>");
-				cores[i].cache_victim_dl2 = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
-					victim_dl2_access_fn, /* hit lat */cores[i].cache_victim_dl2_lat);
+				if (sscanf(cores[i].cache_dvictim_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
+					fatal("bad l1->l2 victim D-cache parm: " "<name>:<nsets>:<bsize>:<assoc>:<repl>");
+				cores[i].cache_dvictim = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
+					dvictim_access_fn, /* hit lat */cores[i].cache_dvictim_lat);
 			}
 		}
 
@@ -1481,10 +1500,10 @@ void sim_check_options()
 				cores[i].cache_il2 = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
 					il2_access_fn, /* hit lat */cores[i].cache_il2_lat);
 
-				if (sscanf(cores[i].cache_victim_il2_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
-					fatal("bad victim I2-cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
-				cores[i].cache_victim_il2 = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
-					victim_il2_access_fn, /* hit lat */cores[i].cache_victim_il2_lat);
+				if (sscanf(cores[i].cache_ivictim_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
+					fatal("bad victim I1-2cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
+				cores[i].cache_ivictim = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
+					ivictim_access_fn, /* hit lat */cores[i].cache_ivictim_lat);
 			}
 		}
 
@@ -1762,10 +1781,10 @@ void sim_aux_stats(FILE *stream)
 	{
 		caches.insert(cores[i].cache_il1);
 		caches.insert(cores[i].cache_il2);
-		caches.insert(cores[i].cache_victim_il2);
+		caches.insert(cores[i].cache_ivictim);
 		caches.insert(cores[i].cache_dl1);
 		caches.insert(cores[i].cache_dl2);
-		caches.insert(cores[i].cache_victim_dl2);
+		caches.insert(cores[i].cache_dvictim);
 		caches.insert(cores[i].itlb);
 		caches.insert(cores[i].dtlb);
 	}
@@ -1800,10 +1819,10 @@ void sim_uninit()
 	{
 		caches.insert(cores[i].cache_il1);
 		caches.insert(cores[i].cache_il2);
-		caches.insert(cores[i].cache_victim_il2);
+		caches.insert(cores[i].cache_ivictim);
 		caches.insert(cores[i].cache_dl1);
 		caches.insert(cores[i].cache_dl2);
-		caches.insert(cores[i].cache_victim_dl2);
+		caches.insert(cores[i].cache_dvictim);
 		caches.insert(cores[i].itlb);
 		caches.insert(cores[i].dtlb);
 	}
@@ -4738,11 +4757,11 @@ void sim_main()
 		if(cores[i].cache_dl2){
 			cores[i].cache_dl2->reset_cache_stats();
 		}
-		if(cores[i].cache_victim_il2){
-			cores[i].cache_victim_il2->reset_cache_stats();
+		if(cores[i].cache_ivictim){
+			cores[i].cache_ivictim->reset_cache_stats();
 		}
-		if(cores[i].cache_victim_dl2){
-			cores[i].cache_victim_dl2->reset_cache_stats();
+		if(cores[i].cache_dvictim){
+			cores[i].cache_dvictim->reset_cache_stats();
 		}
 		if(cores[i].itlb){
 			cores[i].itlb->reset_cache_stats();
@@ -4784,7 +4803,7 @@ void sim_main()
 	}
 	//main simulator loop, NOTE: the pipe stages are traverse in reverse order
 	//to eliminate this/next state synchronization and relaxation problems
-	for(;;)
+	for(int i=0;i<1000;i++)
 	{
 		for(int i=0;i<num_contexts;i++)
 		{
