@@ -256,14 +256,14 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	{ 
 		// Globably instantiating this here incase memory is written correctly.
 		//This is probably a bad practice due to the default value potentially being used at wrong times.
-		unsigned long long lat = 0;
+		// unsigned long long lat = 0;
 
 		//access next level of data cache hierarchy but first checking the victim cache
-		if (cores[contexts[context_id].core_id].cache_dvictim) {
-			unsigned long long lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		} else {
+		// if (cores[contexts[context_id].core_id].cache_dvictim) {
+		// 	unsigned long long lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		// } else {
 			unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		}
+		// }
 
 		//Wattch -- Dcache2 access
 		// TODO(MSR): Fix this and add it for victim_cache. This is also probably screwing up the power access for dcache2.
@@ -403,14 +403,14 @@ il1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	{
 		// Globably instantiating this here incase memory is written correctly.
 		//This is probably a bad practice due to the default value potentially being used at wrong times.
-		unsigned long long lat = 0; 
+		// unsigned long long lat = 0; 
 
 		//access next level of data cache hierarchy
-		if (cores[contexts[context_id].core_id].cache_dvictim) {
-			unsigned long long lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		} else {
+		// if (cores[contexts[context_id].core_id].cache_dvictim) {
+		// 	unsigned long long lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		// } else {
 			unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		}
+		// }
 
 		//Wattch -- Dcache2 access
 		cores[contexts[context_id].core_id].power.dcache2_access++;

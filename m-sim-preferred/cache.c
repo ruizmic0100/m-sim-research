@@ -165,7 +165,7 @@ void cache_t::link_htab_ent(cache_set_t *set,		//set containing bkt chain
 	cache_blk_t *blk)				//block to insert
 {
 	int index = CACHE_HASH(this, blk->tag);
-
+	std::cout << "Inserted BLK onto the head of the hash table bucket chain in SET.\n" << std::endl;
 	//insert block onto the head of the bucket chain
 	blk->hash_next = set->hash[index];
 	set->hash[index] = blk;
@@ -501,6 +501,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	md_addr_t bofs = CACHE_BLK(this, addr);
 	long long lat = 0;
 
+	printf("cache_name: %s\n", this->name.c_str());
 
 	//default replacement address
 	if(repl_addr)
