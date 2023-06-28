@@ -212,6 +212,8 @@ class cache_t
 
 		void display_caches(md_addr_t addr, md_addr_t set, md_addr_t bofs);
 
+		void show_cache_entries(cache_blk_t* blk, md_addr_t set);
+
 	private:
 #ifdef USE_HASH
 		//insert BLK onto the head of the hash table bucket chain in SET

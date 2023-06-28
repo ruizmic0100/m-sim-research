@@ -256,14 +256,16 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	{ 
 		// Globably instantiating this here incase memory is written correctly.
 		//This is probably a bad practice due to the default value potentially being used at wrong times.
-		// unsigned long long lat = 0;
+		unsigned long long lat = 0;
 
 		//access next level of data cache hierarchy but first checking the victim cache
-		// if (cores[contexts[context_id].core_id].cache_dvictim) {
-		// 	unsigned long long lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		// } else {
-			unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		// }
+		if (cores[contexts[context_id].core_id].cache_dvictim) {
+			lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		} else {
+			lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		}
+
+		// unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
 
 		//Wattch -- Dcache2 access
 		// TODO(MSR): Fix this and add it for victim_cache. This is also probably screwing up the power access for dcache2.
@@ -403,14 +405,16 @@ il1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	{
 		// Globably instantiating this here incase memory is written correctly.
 		//This is probably a bad practice due to the default value potentially being used at wrong times.
-		// unsigned long long lat = 0; 
+		unsigned long long lat = 0; 
 
 		//access next level of data cache hierarchy
-		// if (cores[contexts[context_id].core_id].cache_dvictim) {
-		// 	unsigned long long lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		// } else {
-			unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		// }
+		if (cores[contexts[context_id].core_id].cache_ivictim) {
+			lat = cores[contexts[context_id].core_id].cache_ivictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		} else {
+			lat = cores[contexts[context_id].core_id].cache_il2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		}
+
+		// unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
 
 		//Wattch -- Dcache2 access
 		cores[contexts[context_id].core_id].power.dcache2_access++;
@@ -811,12 +815,12 @@ void sim_reg_options(opt_odb_t *odb)
 
 		opt_reg_string(odb, "-cache_victim:d",offset,
 			 "victim cache inbetween L1-L2 data cache config, i.e., {<config>|none}",
-			 &cores[i].cache_dvictim_opt, "victim:4096:64:1:f",
+			 &cores[i].cache_dvictim_opt, "victim:1:64:512:f",
 			 /* print */TRUE, NULL);
 
 		opt_reg_int(odb, "-cache_victim:dlat",offset,
 			"victim cache inbetween L1-L2 data cache hit latency (in cycles)",
-			&cores[i].cache_dvictim_lat, /* default */10,
+			&cores[i].cache_dvictim_lat, /* default */5,
 			/* print */TRUE, /* format */NULL);
 
 		opt_reg_string(odb, "-cache:il1",offset,
@@ -846,7 +850,7 @@ void sim_reg_options(opt_odb_t *odb)
 
 		opt_reg_int(odb, "-cache_victim:ilat",offset,
 			"victim cache inbetween L1-L2 instruction cache hit latency (in cycles)",
-			&cores[i].cache_ivictim_lat, /* default */10,
+			&cores[i].cache_ivictim_lat, /* default */5,
 			/* print */TRUE, /* format */NULL);
 
 		//TLB options
@@ -4619,6 +4623,7 @@ void sim_main()
 {
 //FIXME: Don't do this here, do this at cache creation time:
 #ifdef BUS_CONTENTION
+	std::cout << "Don't do this here, do this at cache creation time:" << "\n";
 	for(size_t i=0;i<cores.size();i++)
 	{
 		cores[i].cache_il1->next_cache = cores[i].cache_dl2;
@@ -4803,7 +4808,8 @@ void sim_main()
 	}
 	//main simulator loop, NOTE: the pipe stages are traverse in reverse order
 	//to eliminate this/next state synchronization and relaxation problems
-	for(int i=0;i<1000;i++)
+	std::cout << "------------------------------------------------ SIM STARTED ----------------------------------------------------" << std::endl;
+	for(;;)
 	{
 		for(int i=0;i<num_contexts;i++)
 		{

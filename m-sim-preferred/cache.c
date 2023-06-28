@@ -482,6 +482,13 @@ void cache_t::display_caches(md_addr_t addr, md_addr_t set, md_addr_t bofs)
 	}
 }
 
+void cache_t::show_cache_entries(cache_blk_t* blk, md_addr_t set)
+{
+	for(blk=sets[set].way_head;blk;blk=blk->way_next) {
+		std::cout << "blk->tag: " << blk->tag << std::endl;
+	}
+}
+
 //access a cache, perform a CMD operation the cache at address ADDR, places NBYTES of 
 //	data at *P, returns latency of operation if initiated at NOW (in cycles), places pointer 
 //	to block user data in *UDATA, *P is untouched if cache blocks are not allocated
@@ -495,13 +502,17 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	byte_t **udata,					//for return of user data ptr
 	md_addr_t *repl_addr)				//for address of replaced block
 {
+	// These macros calculate the tag, set, and bofs from the passed in address.
 	byte_t *p = (byte_t *)vp;
 	md_addr_t tag = CACHE_TAG(this, addr);
 	md_addr_t set = CACHE_SET(this, addr);
 	md_addr_t bofs = CACHE_BLK(this, addr);
 	long long lat = 0;
-
-	printf("cache_name: %s\n", this->name.c_str());
+	// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+	// 	std::cout << "-----------------------------------------------" << std::endl;
+	// 	printf("cache_name: %s\t| addr: %d\n", this->name.c_str(), addr);
+	// 	std::cout << "tag: " << tag <<"\tset: " << set << std::endl;
+	// }
 
 	//default replacement address
 	if(repl_addr)
@@ -519,6 +530,11 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 
 	cache_blk_t *blk(NULL);
 	cache_blk_t * repl(NULL);
+
+	// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+	// 	std::cout << "------- 1st -------" << std::endl;
+	// 	show_cache_entries(blk, set);
+	// }
 
 #ifdef USE_HASH
 	if(hsize)
@@ -538,14 +554,19 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 		//low-associativity cache, linear search the way list
 		for(blk=sets[set].way_head;blk;blk=blk->way_next)
 		{
-			if(blk->tag == tag && (blk->status & CACHE_BLK_VALID) && (blk->context_id == context_id))
+			if(blk->tag == tag && (blk->status & CACHE_BLK_VALID) && (blk->context_id == context_id)) {
+				// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+				// 	std::cout << "Cache hit on: " << blk->tag << std::endl;
+				// }
 				goto cache_hit;
+			}
 		}
+		// std::cout << "MISS!" << std::endl;
 	}
 
 	//Cache block not found, MISS
 	misses++;
-
+	// std::cout << "policy: " << policy << std::endl;
 	//select the appropriate block to replace, and re-link this entry to
 	//	the appropriate place in the way list
 	switch(policy)
@@ -554,6 +575,10 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	case FIFO:
 		repl = sets[set].way_tail;
 		update_way_list(&sets[set], repl, Head);
+		// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+		// 	std::cout << "------- Miss FIFO -------" << std::endl;
+		// 	show_cache_entries(blk, set);
+		// }
 		break;
 	case Random:
 		{
@@ -576,6 +601,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	//write back replaced block data
 	if(repl->status & CACHE_BLK_VALID)
 	{
+		// std::cout << "		CACHE_BLK_VALID" << std::endl;
 		replacements++;
 
 		if(repl_addr)
@@ -587,6 +613,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
  
 		if(repl->status & CACHE_BLK_DIRTY)
 		{
+			// std::cout << "			CACHE_BLK_DIRTY" << std::endl;
 			//The replaced block is dirty, write it back
 			writebacks++;
 
@@ -617,10 +644,16 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 #endif
 			//Add latency needed to write back
 			lat += blk_access_fn(Write, CACHE_MK_BADDR(this, repl->tag, set), bsize, repl, now+lat, context_id);
+			// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+			// 	std::cout << "------- Miss Writeback -------" << std::endl;
+			// 	show_cache_entries(blk, set);
+			// }
 		}
+
 	}
 
 	//update block tags
+	// std::cout << "Updating block tags" << std::endl;
 	repl->tag = tag;
 	repl->context_id = context_id;
 	repl->status = CACHE_BLK_VALID;
@@ -652,14 +685,24 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	//If a write, mark this block as dirty
 	if(cmd == Write)
 	{
+		// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+		// 	std::cout << "This write made block: " << repl->tag << " dirty" << std::endl;
+		// }
 		repl->status |= CACHE_BLK_DIRTY;
 	}
 
 	//copy data out of cache block
+	// NOTE(MSR): This is disabled by default.
 	if(balloc)
 	{
+		std::cout << "CACHE_BCOPY!!!" << std::endl;
 		CACHE_BCOPY(cmd, repl, bofs, p, nbytes);
 	}
+
+	// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+		// std::cout << "------- Miss End -------" << std::endl;
+		// show_cache_entries(blk, set);
+	// }
 
 	//get user block data, if requested and it exists
 	if(udata)
@@ -682,8 +725,10 @@ cache_hit:
 	hits++;
 
 	//copy data out of cache block, if block exists
+	// NOTE(MSR): This is disabled by default.
 	if(balloc)
 	{
+		std::cout << "Copying Data out of cache block: " << blk << std::endl;
 		CACHE_BCOPY(cmd, blk, bofs, p, nbytes);
 	}
 
@@ -691,10 +736,15 @@ cache_hit:
 	if(cmd == Write)
 		blk->status |= CACHE_BLK_DIRTY;
 
-	//if this is not the first element of the list and we are using LRU, move the block to the head of the MRU list
+	//if this is not the first element of the list and we are using LRU, move the block to the head of the LRU list
 	if(blk->way_prev && (policy == LRU))
 	{
+		// std::cout << "Moved blk to the head of the LRU for a cache hit." << std::endl;
 		update_way_list(&sets[set], blk, Head);
+		// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+		// 	std::cout << "--------- 2nd ------" << std::endl;
+		// 	show_cache_entries(blk, set);
+		// }
 	}
 
 #ifdef USE_HASH
