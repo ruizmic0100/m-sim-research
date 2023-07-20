@@ -259,11 +259,12 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 		unsigned long long lat = 0;
 
 		//access next level of data cache hierarchy but first checking the victim cache
-		if (cores[contexts[context_id].core_id].cache_dvictim) {
+		// if (cores[contexts[context_id].core_id].cache_dvictim) {
 			lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		} else {
-			lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		}
+		// } 
+		// else {
+			// lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		// }
 
 		// unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
 
@@ -406,14 +407,16 @@ il1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 		// Globably instantiating this here incase memory is written correctly.
 		//This is probably a bad practice due to the default value potentially being used at wrong times.
 		unsigned long long lat = 0; 
+		std::cout << "inside il1" << std::endl;
 
 		//access next level of data cache hierarchy
-		if (cores[contexts[context_id].core_id].cache_ivictim) {
-			lat = cores[contexts[context_id].core_id].cache_ivictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		} else {
+		// if (cores[contexts[context_id].core_id].cache_ivictim) {
+		// 	std::cout << "access ivictim..." << std::endl;
+		// 	lat = cores[contexts[context_id].core_id].cache_ivictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		// } else {
 			lat = cores[contexts[context_id].core_id].cache_il2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		}
-
+		// }
+		
 		// unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
 
 		//Wattch -- Dcache2 access
@@ -477,6 +480,7 @@ il2_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	tick_t now,			//time of access
 	int context_id)			//context_id of the access
 {
+	std::cout << "inside il2" << std::endl;
 	if(cache_il3)
 	{
 		//access next level of inst cache hierarchy
@@ -815,7 +819,7 @@ void sim_reg_options(opt_odb_t *odb)
 
 		opt_reg_string(odb, "-cache_victim:d",offset,
 			 "victim cache inbetween L1-L2 data cache config, i.e., {<config>|none}",
-			 &cores[i].cache_dvictim_opt, "victim:1:64:512:f",
+			 &cores[i].cache_dvictim_opt, "dvictim:256:64:16:l",
 			 /* print */TRUE, NULL);
 
 		opt_reg_int(odb, "-cache_victim:dlat",offset,
@@ -845,7 +849,7 @@ void sim_reg_options(opt_odb_t *odb)
 
 		opt_reg_string(odb, "-cache_victim:i",offset,
 			"victim cache inbetween L1-L2 instruction cache config, i.e., {<config>|dl2|none}",
-			&cores[i].cache_ivictim_opt, "victim",
+			&cores[i].cache_ivictim_opt, "ivictim:1:64:16:f",
 			/* print */TRUE, NULL);
 
 		opt_reg_int(odb, "-cache_victim:ilat",offset,
@@ -1504,10 +1508,10 @@ void sim_check_options()
 				cores[i].cache_il2 = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
 					il2_access_fn, /* hit lat */cores[i].cache_il2_lat);
 
-				if (sscanf(cores[i].cache_ivictim_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
-					fatal("bad victim I1-2cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
-				cores[i].cache_ivictim = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
-					ivictim_access_fn, /* hit lat */cores[i].cache_ivictim_lat);
+				// if (sscanf(cores[i].cache_ivictim_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
+				// 	fatal("bad victim I1-2cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
+				// cores[i].cache_ivictim = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
+				// 	ivictim_access_fn, /* hit lat */cores[i].cache_ivictim_lat);
 			}
 		}
 
@@ -1785,7 +1789,7 @@ void sim_aux_stats(FILE *stream)
 	{
 		caches.insert(cores[i].cache_il1);
 		caches.insert(cores[i].cache_il2);
-		caches.insert(cores[i].cache_ivictim);
+		// caches.insert(cores[i].cache_ivictim);
 		caches.insert(cores[i].cache_dl1);
 		caches.insert(cores[i].cache_dl2);
 		caches.insert(cores[i].cache_dvictim);
@@ -1823,7 +1827,7 @@ void sim_uninit()
 	{
 		caches.insert(cores[i].cache_il1);
 		caches.insert(cores[i].cache_il2);
-		caches.insert(cores[i].cache_ivictim);
+		// caches.insert(cores[i].cache_ivictim);
 		caches.insert(cores[i].cache_dl1);
 		caches.insert(cores[i].cache_dl2);
 		caches.insert(cores[i].cache_dvictim);
@@ -4762,9 +4766,9 @@ void sim_main()
 		if(cores[i].cache_dl2){
 			cores[i].cache_dl2->reset_cache_stats();
 		}
-		if(cores[i].cache_ivictim){
-			cores[i].cache_ivictim->reset_cache_stats();
-		}
+		// if(cores[i].cache_ivictim){
+		// 	cores[i].cache_ivictim->reset_cache_stats();
+		// }
 		if(cores[i].cache_dvictim){
 			cores[i].cache_dvictim->reset_cache_stats();
 		}
@@ -4809,7 +4813,7 @@ void sim_main()
 	//main simulator loop, NOTE: the pipe stages are traverse in reverse order
 	//to eliminate this/next state synchronization and relaxation problems
 	std::cout << "------------------------------------------------ SIM STARTED ----------------------------------------------------" << std::endl;
-	for(;;)
+	for(int i = 0; i < 45000; i++)
 	{
 		for(int i=0;i<num_contexts;i++)
 		{

@@ -511,7 +511,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
 	// 	std::cout << "-----------------------------------------------" << std::endl;
 	// 	printf("cache_name: %s\t| addr: %d\n", this->name.c_str(), addr);
-	// 	std::cout << "tag: " << tag <<"\tset: " << set << std::endl;
+	// 	std::cout << "looking for tag: " << tag <<"\t in set: " << set << std::endl;
 	// }
 
 	//default replacement address
@@ -532,7 +532,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	cache_blk_t * repl(NULL);
 
 	// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-	// 	std::cout << "------- 1st -------" << std::endl;
+	// 	std::cout << "------- Cache Set Initially -------" << std::endl;
 	// 	show_cache_entries(blk, set);
 	// }
 
@@ -561,7 +561,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 				goto cache_hit;
 			}
 		}
-		// std::cout << "MISS!" << std::endl;
+		// std::cout << "    !MISS!" << std::endl;
 	}
 
 	//Cache block not found, MISS
@@ -576,7 +576,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 		repl = sets[set].way_tail;
 		update_way_list(&sets[set], repl, Head);
 		// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-		// 	std::cout << "------- Miss FIFO -------" << std::endl;
+		// 	std::cout << "------- Updatge cache entries on miss -------" << std::endl;
 		// 	show_cache_entries(blk, set);
 		// }
 		break;
@@ -700,8 +700,8 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	}
 
 	// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-		// std::cout << "------- Miss End -------" << std::endl;
-		// show_cache_entries(blk, set);
+	// 	std::cout << "------- Miss End -------" << std::endl;
+	// 	show_cache_entries(blk, set);
 	// }
 
 	//get user block data, if requested and it exists
@@ -742,7 +742,7 @@ cache_hit:
 		// std::cout << "Moved blk to the head of the LRU for a cache hit." << std::endl;
 		update_way_list(&sets[set], blk, Head);
 		// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-		// 	std::cout << "--------- 2nd ------" << std::endl;
+		// 	std::cout << "--------- hit ------" << std::endl;
 		// 	show_cache_entries(blk, set);
 		// }
 	}
