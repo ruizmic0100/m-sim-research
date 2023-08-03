@@ -1,17 +1,6 @@
-throughputipc: 0.000000
-throughputipc: 0.000000
-throughputipc: 0.222267
-throughputipc: 0.828467
-throughputipc: 0.828467
-throughputipc: 0.828467
-throughputipc: 0.828467
-throughputipc: 0.828467
-throughputipc: 0.828467
-throughputipc: 0.828467
-throughputipc: 0.828467
-throughputipc: 0.828467
-throughputipc: 0.828467
+---- BaseLine: No Victim Cache ----
 throughputipc: 1.644422
-throughputipc: 0.828467
-throughputipc: 0.828467
-throughputipc: 1.654200
+throughputipc: 1.763044
+throughputipc: 0.913600
+throughputipc: 0.875156
+----

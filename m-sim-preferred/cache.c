@@ -54,6 +54,8 @@
 
 #include "cache.h"
 
+#define PRINT_CACHE_ACCESSES
+
 //cache access macros
 #define CACHE_TAG(cp, addr)			((addr) >> (cp)->tag_shift)
 #define CACHE_SET(cp, addr)			(((addr) >> (cp)->set_shift) & (cp)->set_mask)
@@ -63,6 +65,9 @@
 //extract/reconstruct a block address
 #define CACHE_BADDR(cp, addr)			((addr) & ~(cp)->blk_mask)
 #define CACHE_MK_BADDR(cp, tag, set)		(((tag) << (cp)->tag_shift)|((set) << (cp)->set_shift))
+// for victim caches
+#define VCACHE_BADDR(cp, addr)			((addr) & ~(cp)->blk_mask)
+#define VCACHE_MK_BADDR(cp, tag, set)		(((tag) << (cp)->tag_shift)|((set) << (cp)->set_shift))
 
 //index an array of cache blocks, non-trivial due to variable length blocks
 #define CACHE_BINDEX(cp, blks, i)		((cache_blk_t *)(((char *)(blks))			\
@@ -508,11 +513,13 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	md_addr_t set = CACHE_SET(this, addr);
 	md_addr_t bofs = CACHE_BLK(this, addr);
 	long long lat = 0;
-	// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-	// 	std::cout << "-----------------------------------------------" << std::endl;
-	// 	printf("cache_name: %s\t| addr: %d\n", this->name.c_str(), addr);
-	// 	std::cout << "looking for tag: " << tag <<"\t in set: " << set << std::endl;
-	// }
+	#ifdef PRINT_CACHE_ACCESSES
+	if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+		std::cout << "-----------------------------------------------" << std::endl;
+		printf("cache_name: %s\t| addr: %d\n", this->name.c_str(), addr);
+		std::cout << "looking for tag: " << tag <<"\t in set: " << set << std::endl;
+	}
+	#endif
 
 	//default replacement address
 	if(repl_addr)
@@ -531,10 +538,12 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	cache_blk_t *blk(NULL);
 	cache_blk_t * repl(NULL);
 
-	// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-	// 	std::cout << "------- Cache Set Initially -------" << std::endl;
-	// 	show_cache_entries(blk, set);
-	// }
+	#ifdef PRINT_CACHE_ACCESSES
+	if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+		std::cout << "------- Cache Set Initially -------" << std::endl;
+		show_cache_entries(blk, set);
+	}
+	#endif
 
 #ifdef USE_HASH
 	if(hsize)
@@ -555,18 +564,19 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 		for(blk=sets[set].way_head;blk;blk=blk->way_next)
 		{
 			if(blk->tag == tag && (blk->status & CACHE_BLK_VALID) && (blk->context_id == context_id)) {
-				// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-				// 	std::cout << "Cache hit on: " << blk->tag << std::endl;
-				// }
+				#ifdef PRINT_CACHE_ACCESSES
+				if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+					std::cout << "Cache hit on: " << blk->tag << std::endl;
+				}
+				#endif
 				goto cache_hit;
 			}
 		}
-		// std::cout << "    !MISS!" << std::endl;
 	}
 
 	//Cache block not found, MISS
 	misses++;
-	// std::cout << "policy: " << policy << std::endl;
+
 	//select the appropriate block to replace, and re-link this entry to
 	//	the appropriate place in the way list
 	switch(policy)
@@ -575,10 +585,12 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	case FIFO:
 		repl = sets[set].way_tail;
 		update_way_list(&sets[set], repl, Head);
-		// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-		// 	std::cout << "------- Updatge cache entries on miss -------" << std::endl;
-		// 	show_cache_entries(blk, set);
-		// }
+		#ifdef PRINT_CACHE_ACCESSES
+		if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+			std::cout << "------- Updatge cache entries on miss -------" << std::endl;
+			show_cache_entries(blk, set);
+		}
+		#endif
 		break;
 	case Random:
 		{
@@ -644,10 +656,12 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 #endif
 			//Add latency needed to write back
 			lat += blk_access_fn(Write, CACHE_MK_BADDR(this, repl->tag, set), bsize, repl, now+lat, context_id);
-			// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-			// 	std::cout << "------- Miss Writeback -------" << std::endl;
-			// 	show_cache_entries(blk, set);
-			// }
+			#ifdef PRINT_CACHE_ACCESSES
+			if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+				std::cout << "------- Miss Writeback -------" << std::endl;
+				show_cache_entries(blk, set);
+			}
+			#endif
 		}
 
 	}
@@ -699,10 +713,12 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 		CACHE_BCOPY(cmd, repl, bofs, p, nbytes);
 	}
 
-	// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-	// 	std::cout << "------- Miss End -------" << std::endl;
-	// 	show_cache_entries(blk, set);
-	// }
+	#ifdef PRINT_CACHE_ACCESSES
+	if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+		std::cout << "------- Miss End -------" << std::endl;
+		show_cache_entries(blk, set);
+	}
+	#endif
 
 	//get user block data, if requested and it exists
 	if(udata)

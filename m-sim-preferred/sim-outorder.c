@@ -254,19 +254,20 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 {
 	if(cores[contexts[context_id].core_id].cache_dl2)
 	{ 
+		#ifdef VICTIM_CACHE_ACCESS
 		// Globably instantiating this here incase memory is written correctly.
 		//This is probably a bad practice due to the default value potentially being used at wrong times.
 		unsigned long long lat = 0;
+		if (cores[contexts[context_id].core_id].cache_dvictim) {
+			lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		} 
+		else {
+			lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		}
+		#endif
 
 		//access next level of data cache hierarchy but first checking the victim cache
-		// if (cores[contexts[context_id].core_id].cache_dvictim) {
-			lat = cores[contexts[context_id].core_id].cache_dvictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		// } 
-		// else {
-			// lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		// }
-
-		// unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
 
 		//Wattch -- Dcache2 access
 		// TODO(MSR): Fix this and add it for victim_cache. This is also probably screwing up the power access for dcache2.
@@ -404,20 +405,20 @@ il1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 {
 	if(cores[contexts[context_id].core_id].cache_il2)
 	{
+		//access next level of data cache hierarchy
+		#ifdef VICTIM_CACHE_ACCESS
 		// Globably instantiating this here incase memory is written correctly.
 		//This is probably a bad practice due to the default value potentially being used at wrong times.
 		unsigned long long lat = 0; 
-		std::cout << "inside il1" << std::endl;
 
-		//access next level of data cache hierarchy
-		// if (cores[contexts[context_id].core_id].cache_ivictim) {
-		// 	std::cout << "access ivictim..." << std::endl;
-		// 	lat = cores[contexts[context_id].core_id].cache_ivictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		// } else {
+		if (cores[contexts[context_id].core_id].cache_ivictim) {
+			lat = cores[contexts[context_id].core_id].cache_ivictim->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		} else {
 			lat = cores[contexts[context_id].core_id].cache_il2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
-		// }
+		}
+		#endif
 		
-		// unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
 
 		//Wattch -- Dcache2 access
 		cores[contexts[context_id].core_id].power.dcache2_access++;
