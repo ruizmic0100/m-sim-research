@@ -513,8 +513,9 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	md_addr_t set = CACHE_SET(this, addr);
 	md_addr_t bofs = CACHE_BLK(this, addr);
 	long long lat = 0;
+
 	#ifdef PRINT_CACHE_ACCESSES
-	if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+	if (this->name == "Core_0_dl1" || this->name == "Core_0_dvictim" || this->name == "Core_0_ul2") {
 		std::cout << "-----------------------------------------------" << std::endl;
 		printf("cache_name: %s\t| addr: %d\n", this->name.c_str(), addr);
 		std::cout << "looking for tag: " << tag <<"\t in set: " << set << std::endl;
@@ -539,7 +540,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	cache_blk_t * repl(NULL);
 
 	#ifdef PRINT_CACHE_ACCESSES
-	if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+	if (this->name == "Core_0_dl1" || this->name == "Core_0_dvictim" || this->name == "Core_0_ul2") {
 		std::cout << "------- Cache Set Initially -------" << std::endl;
 		show_cache_entries(blk, set);
 	}
@@ -565,7 +566,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 		{
 			if(blk->tag == tag && (blk->status & CACHE_BLK_VALID) && (blk->context_id == context_id)) {
 				#ifdef PRINT_CACHE_ACCESSES
-				if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+				if (this->name == "Core_0_dl1" || this->name == "Core_0_dvictim" || this->name == "Core_0_ul2") {
 					std::cout << "Cache hit on: " << blk->tag << std::endl;
 				}
 				#endif
@@ -586,8 +587,8 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 		repl = sets[set].way_tail;
 		update_way_list(&sets[set], repl, Head);
 		#ifdef PRINT_CACHE_ACCESSES
-		if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-			std::cout << "------- Updatge cache entries on miss -------" << std::endl;
+		if (this->name == "Core_0_dl1" || this->name == "Core_0_dvictim" || this->name == "Core_0_ul2") {
+			std::cout << "------- Update cache entries on miss -------" << std::endl;
 			show_cache_entries(blk, set);
 		}
 		#endif
@@ -655,13 +656,8 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 //End FIXME
 #endif
 			//Add latency needed to write back
+			std::cout << "nested blk_access_fn" << std::endl;
 			lat += blk_access_fn(Write, CACHE_MK_BADDR(this, repl->tag, set), bsize, repl, now+lat, context_id);
-			#ifdef PRINT_CACHE_ACCESSES
-			if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-				std::cout << "------- Miss Writeback -------" << std::endl;
-				show_cache_entries(blk, set);
-			}
-			#endif
 		}
 
 	}
@@ -699,7 +695,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	//If a write, mark this block as dirty
 	if(cmd == Write)
 	{
-		// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
+		// if (this->name == "Core_0_dl1" || this->name == "Core_0_dvictim" || this->name == "Core_0_ul2") {
 		// 	std::cout << "This write made block: " << repl->tag << " dirty" << std::endl;
 		// }
 		repl->status |= CACHE_BLK_DIRTY;
@@ -714,8 +710,11 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 	}
 
 	#ifdef PRINT_CACHE_ACCESSES
-	if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-		std::cout << "------- Miss End -------" << std::endl;
+	if (this->name == "Core_0_dl1" || this->name == "Core_0_dvictim" || this->name == "Core_0_ul2") {
+		std::cout << "----------------------------------------" << std::endl;
+		std::cout << "cache_name: " << this->name << std::endl;
+		std::cout << "replacing tag: " << tag <<"\t in set: " << set << std::endl;
+		std::cout << "------- Miss Writeback -------" << std::endl;
 		show_cache_entries(blk, set);
 	}
 	#endif
@@ -733,6 +732,7 @@ unsigned long long cache_t::cache_access(mem_cmd cmd,	//access type, Read or Wri
 		link_htab_ent(&sets[set], repl);
 #endif
 
+	std::cout << "at the end of a miss" << std::endl;
 	//return latency of the operation
 	return lat;
 
@@ -757,10 +757,10 @@ cache_hit:
 	{
 		// std::cout << "Moved blk to the head of the LRU for a cache hit." << std::endl;
 		update_way_list(&sets[set], blk, Head);
-		// if (this->name == "Core_0_dl1" || this->name == "Core_0_victim" || this->name == "Core_0_ul2") {
-		// 	std::cout << "--------- hit ------" << std::endl;
-		// 	show_cache_entries(blk, set);
-		// }
+		if (this->name == "Core_0_dl1" || this->name == "Core_0_dvictim" || this->name == "Core_0_ul2") {
+			std::cout << "--------- hit ------" << std::endl;
+			show_cache_entries(blk, set);
+		}
 	}
 
 #ifdef USE_HASH

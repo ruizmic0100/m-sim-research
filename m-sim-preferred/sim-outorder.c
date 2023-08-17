@@ -89,6 +89,7 @@
 #include "sim-outorder.h"
 
 //#define RESERVE_L1_SLOT_IN_WB
+#define VICTIM_CACHE_ACCESS
 
 
 /*
@@ -252,6 +253,7 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 	tick_t now,			//time of access
 	int context_id)			//context_id for the access
 {
+	std::cout << "New dl1_access_fn call" << std::endl;
 	if(cores[contexts[context_id].core_id].cache_dl2)
 	{ 
 		#ifdef VICTIM_CACHE_ACCESS
@@ -264,10 +266,12 @@ dl1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 		else {
 			lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
 		}
-		#endif
+		#else
 
 		//access next level of data cache hierarchy but first checking the victim cache
 		unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+
+		#endif
 
 		//Wattch -- Dcache2 access
 		// TODO(MSR): Fix this and add it for victim_cache. This is also probably screwing up the power access for dcache2.
@@ -416,9 +420,10 @@ il1_access_fn(mem_cmd cmd,		//access cmd, Read or Write
 		} else {
 			lat = cores[contexts[context_id].core_id].cache_il2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
 		}
-		#endif
+		#else
 		
 		unsigned long long lat = cores[contexts[context_id].core_id].cache_dl2->cache_access(cmd, baddr, context_id, NULL, bsize, now, NULL, NULL);
+		#endif
 
 		//Wattch -- Dcache2 access
 		cores[contexts[context_id].core_id].power.dcache2_access++;
@@ -820,12 +825,12 @@ void sim_reg_options(opt_odb_t *odb)
 
 		opt_reg_string(odb, "-cache_victim:d",offset,
 			 "victim cache inbetween L1-L2 data cache config, i.e., {<config>|none}",
-			 &cores[i].cache_dvictim_opt, "dvictim:256:64:16:l",
+			 &cores[i].cache_dvictim_opt, "dvictim:16:64:16:f",
 			 /* print */TRUE, NULL);
 
 		opt_reg_int(odb, "-cache_victim:dlat",offset,
 			"victim cache inbetween L1-L2 data cache hit latency (in cycles)",
-			&cores[i].cache_dvictim_lat, /* default */5,
+			&cores[i].cache_dvictim_lat, /* default */1,
 			/* print */TRUE, /* format */NULL);
 
 		opt_reg_string(odb, "-cache:il1",offset,
@@ -850,12 +855,12 @@ void sim_reg_options(opt_odb_t *odb)
 
 		opt_reg_string(odb, "-cache_victim:i",offset,
 			"victim cache inbetween L1-L2 instruction cache config, i.e., {<config>|dl2|none}",
-			&cores[i].cache_ivictim_opt, "ivictim:1:64:16:f",
+			&cores[i].cache_ivictim_opt, "ivictim:16:64:16:f",
 			/* print */TRUE, NULL);
 
 		opt_reg_int(odb, "-cache_victim:ilat",offset,
 			"victim cache inbetween L1-L2 instruction cache hit latency (in cycles)",
-			&cores[i].cache_ivictim_lat, /* default */5,
+			&cores[i].cache_ivictim_lat, /* default */1,
 			/* print */TRUE, /* format */NULL);
 
 		//TLB options
@@ -1509,10 +1514,10 @@ void sim_check_options()
 				cores[i].cache_il2 = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
 					il2_access_fn, /* hit lat */cores[i].cache_il2_lat);
 
-				// if (sscanf(cores[i].cache_ivictim_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
-				// 	fatal("bad victim I1-2cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
-				// cores[i].cache_ivictim = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
-				// 	ivictim_access_fn, /* hit lat */cores[i].cache_ivictim_lat);
+				if (sscanf(cores[i].cache_ivictim_opt, "%[^:]:%d:%d:%d:%c", name, &nsets, &bsize, &assoc, &c) != 5)
+					fatal("bad victim I1-2cache parms: <name>:<nsets>:<bsize>:<assoc>:<repl>");
+				cores[i].cache_ivictim = new cache_t(prepend + name, nsets, bsize, /* balloc */FALSE, /* usize */0, assoc, cache_char2policy(c),
+					ivictim_access_fn, /* hit lat */cores[i].cache_ivictim_lat);
 			}
 		}
 
@@ -1790,7 +1795,7 @@ void sim_aux_stats(FILE *stream)
 	{
 		caches.insert(cores[i].cache_il1);
 		caches.insert(cores[i].cache_il2);
-		// caches.insert(cores[i].cache_ivictim);
+		caches.insert(cores[i].cache_ivictim);
 		caches.insert(cores[i].cache_dl1);
 		caches.insert(cores[i].cache_dl2);
 		caches.insert(cores[i].cache_dvictim);
@@ -1828,7 +1833,7 @@ void sim_uninit()
 	{
 		caches.insert(cores[i].cache_il1);
 		caches.insert(cores[i].cache_il2);
-		// caches.insert(cores[i].cache_ivictim);
+		caches.insert(cores[i].cache_ivictim);
 		caches.insert(cores[i].cache_dl1);
 		caches.insert(cores[i].cache_dl2);
 		caches.insert(cores[i].cache_dvictim);
@@ -2132,6 +2137,7 @@ void commit(unsigned int core_num)
 						cores[core_num].power.dcache_access++;
 
 						//commit store value to D-cache
+						std::cout << "commit cache_access write call" << std::endl;
 						lat = cores[core_num].cache_dl1->cache_access(Write, (contexts[context_id].LSQ[contexts[context_id].LSQ_head].addr&~3),
 							context_id, NULL, 4, sim_cycle, NULL, NULL);
 						latency_vals.push_back(lat);
@@ -2146,6 +2152,7 @@ void commit(unsigned int core_num)
 					//all loads and stores must access D-TLB
 					if(cores[core_num].dtlb)
 					{
+						std::cout << "commit cache_access read call" << std::endl;
 						lat = cores[core_num].dtlb->cache_access(Read, (contexts[context_id].LSQ[contexts[context_id].LSQ_head].addr & ~3),
 							context_id, NULL, 4, sim_cycle, NULL, NULL);
 						if(lat > 1)
@@ -2768,6 +2775,7 @@ void selection(unsigned int core_num)
 								cores[core_num].power.dcache_access++;
 
 								//access the cache if non-faulting
+								std::cout << "selection cache access read call" << std::endl;
 								load_lat = cores[core_num].cache_dl1->cache_access(Read,(rs->addr & ~3), rs->context_id, NULL, 4, sim_cycle, NULL, NULL);
 
 								if(load_lat > cores[core_num].cache_dl1_lat)
@@ -4767,9 +4775,9 @@ void sim_main()
 		if(cores[i].cache_dl2){
 			cores[i].cache_dl2->reset_cache_stats();
 		}
-		// if(cores[i].cache_ivictim){
-		// 	cores[i].cache_ivictim->reset_cache_stats();
-		// }
+		if(cores[i].cache_ivictim){
+			cores[i].cache_ivictim->reset_cache_stats();
+		}
 		if(cores[i].cache_dvictim){
 			cores[i].cache_dvictim->reset_cache_stats();
 		}
@@ -4814,7 +4822,7 @@ void sim_main()
 	//main simulator loop, NOTE: the pipe stages are traverse in reverse order
 	//to eliminate this/next state synchronization and relaxation problems
 	std::cout << "------------------------------------------------ SIM STARTED ----------------------------------------------------" << std::endl;
-	for(int i = 0; i < 45000; i++)
+	for(;;)
 	{
 		for(int i=0;i<num_contexts;i++)
 		{
